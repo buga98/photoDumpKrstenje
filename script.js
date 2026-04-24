@@ -722,7 +722,19 @@ function showToast(message) {
 
   setTimeout(() => toast.classList.remove("show"), 2000);
 }
+let lastTap = 0;
 
+document.addEventListener("touchend", function(e) {
+
+  const now = Date.now();
+
+  if (now - lastTap < 350) {
+    e.preventDefault();
+  }
+
+  lastTap = now;
+
+}, { passive: false });
 /* ===== AUTO LOAD ===== */
 if (document.getElementById("feed")) {
   loadFeed();

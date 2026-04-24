@@ -747,3 +747,14 @@ button:active,
   50% { transform: scale(1.35); }
   100% { transform: scale(1); }
 }
+.feed-card img {
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: manipulation;
+}
+img,
+.feed-card,
+.like-box,
+body {
+  touch-action: manipulation;
+}
