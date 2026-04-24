@@ -136,7 +136,47 @@ function renderFeedChange(change, feed, isLiveTop = false) {
     feed.appendChild(card);
   }
 }
+async function resizeImage(file, maxWidth, quality) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    const img = new Image();
 
+    reader.onload = (e) => img.src = e.target.result;
+
+    img.onload = () => {
+
+      let width = img.width;
+      let height = img.height;
+
+      if (width > maxWidth) {
+        height = height * (maxWidth / width);
+        width = maxWidth;
+      }
+
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+
+      canvas.width = width;
+      canvas.height = height;
+
+      ctx.drawImage(img, 0, 0, width, height);
+
+      canvas.toBlob((blob) => {
+        const newFile = new File(
+          [blob],
+          file.name.replace(/\.[^/.]+$/, "") + ".jpg",
+          { type: "image/jpeg" }
+        );
+
+        resolve(newFile);
+
+      }, "image/jpeg", quality);
+
+    };
+
+    reader.readAsDataURL(file);
+  });
+}
 function createFeedCard(photoId, data) {
   const userId = localStorage.getItem("userId");
 
@@ -145,7 +185,7 @@ function createFeedCard(photoId, data) {
   card.dataset.id = photoId;
 
   const img = document.createElement("img");
-  img.src = data.imageUrl;
+  img.src = data.thumbUrl || data.imageUrl;
   img.loading = "lazy";
   img.decoding = "async";
 
@@ -393,31 +433,53 @@ window.switchScreen = function (screen) {
 
 /* ===== UPLOAD ===== */
 window.uploadToFirebase = function (file, user, onProgress) {
-  return new Promise((resolve, reject) => {
-    const storageRef = ref(storage, 'photos/' + Date.now() + '_' + file.name);
-    const uploadTask = uploadBytesResumable(storageRef, file);
+  return new Promise(async (resolve, reject) => {
 
-    uploadTask.on(
-      "state_changed",
-      (snapshot) => {
-        const percent = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-        if (onProgress) onProgress(percent);
-      },
-      reject,
-      async () => {
-        const url = await getDownloadURL(uploadTask.snapshot.ref);
+    try {
 
-        await addDoc(collection(db, "photos"), {
-          imageUrl: url,
-          user: user,
-          userId: localStorage.getItem("userId"),
-          created: Date.now(), // 🔥 FIX
-          likes:0
-        });
+      const bigFile = await resizeImage(file, 1600, 0.8);
+      const thumbFile = await resizeImage(file, 450, 0.65);
 
-        resolve(url);
-      }
-    );
+      // BIG
+      const bigRef = ref(storage, 'photos/' + Date.now() + '_' + file.name);
+      const uploadTask = uploadBytesResumable(bigRef, bigFile);
+
+      uploadTask.on(
+        "state_changed",
+        (snapshot) => {
+          const percent =
+            (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+
+          if (onProgress) onProgress(percent);
+        },
+        reject,
+        async () => {
+
+          const imageUrl = await getDownloadURL(uploadTask.snapshot.ref);
+
+          // THUMB
+          const thumbRef = ref(storage, 'thumbs/' + Date.now() + '_' + file.name);
+
+          await uploadBytesResumable(thumbRef, thumbFile);
+
+          const thumbUrl = await getDownloadURL(thumbRef);
+
+          await addDoc(collection(db, "photos"), {
+            imageUrl,
+            thumbUrl,
+            user,
+            userId: localStorage.getItem("userId"),
+            created: Date.now(),
+            likes: 0
+          });
+
+          resolve(imageUrl);
+        }
+      );
+
+    } catch (err) {
+      reject(err);
+    }
   });
 };
 
