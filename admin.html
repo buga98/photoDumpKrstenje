@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin - PhotoDump</title>
+
+  <link rel="stylesheet" href="style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700&family=Poppins:wght@300;400;500&display=swap" rel="stylesheet">
+</head>
+
+<body>
+
+<div class="topbar">💍 Admin panel</div>
+
+<div class="container">
+
+  <!-- HEADER -->
+  <div class="admin-header glass">
+    <h2>Upravljanje sadržajem ⚙️</h2>
+    <p>Fotografije i uspomene s vjenčanja</p>
+  </div>
+
+  <!-- STATISTIKA -->
+  <div class="admin-stats">
+    <div>📸 <span id="photoCount">0</span></div>
+    <div>💌 <span id="dedicationCount">0</span></div>
+  </div>
+
+  <!-- AKCIJE -->
+  <div class="admin-actions-grid">
+
+    <div class="admin-card" onclick="startSlideshow()">
+      ▶️
+      <span>Slideshow</span>
+    </div>
+
+    <div class="admin-card" onclick="openSettings()">
+      ⚙️
+      <span>Postavke</span>
+    </div>
+
+  </div>
+  <!-- FILTERI -->
+  <div class="admin-filters">
+    <button onclick="filterPhotos('all')">Sve</button>
+    <button onclick="filterPhotos('visible')">Vidljive</button>
+    <button onclick="filterPhotos('hidden')">Skrivene</button>
+  </div>
+
+  <!-- SLIKE -->
+  <div id="adminPhotos" class="tab-content active">
+    <div id="gallery"></div>
+  </div>
+
+  <!-- POSVETE -->
+  <div id="adminDedications" class="tab-content">
+    <div id="dedicationsList"></div>
+  </div>
+
+</div>
+
+<!-- MODALI OSTAJU ISTI -->
+
+<div id="dedicationModal" class="modal">
+  <div class="modal-box">
+    <p id="dedicationFullText"></p>
+    <div id="dedicationAuthor"></div>
+    <button onclick="closeDedicationModal()">Zatvori</button>
+  </div>
+</div>
+
+<div id="photoActionModal" class="modal">
+  <div class="modal-box action-box">
+    <h3 id="photoActionTitle"></h3>
+    <div class="action-buttons">
+      <button class="btn-yes" onclick="confirmPhotoAction(true)">Da</button>
+      <button class="btn-no" onclick="confirmPhotoAction(false)">Ne</button>
+    </div>
+  </div>
+</div>
+
+<div id="settingsModal" class="modal">
+  <div class="modal-box settings-box">
+
+    <div class="modal-header">
+      <h3>⚙️ Postavke</h3>
+      <span class="close-btn" onclick="closeSettings()">✖</span>
+    </div>
+
+    <div class="settings-group">
+      <label>Trajanje slajda</label>
+      <select id="slideSpeed" class="input-modern">
+        <option value="2000">2 sekunde</option>
+        <option value="3000">3 sekunde</option>
+        <option value="5000">5 sekundi</option>
+        <option value="10000">10 sekundi</option>
+      </select>
+    </div>
+
+    <div class="settings-group checkbox-row">
+      <label class="checkbox-label">
+        <input type="checkbox" id="showAuthor" checked>
+        <span class="custom-check"></span>
+        Prikaži ime autora
+      </label>
+    </div>
+
+    <div class="settings-group">
+      <button class="btn-secondary" onclick="downloadAllPhotos()">
+        📥 Preuzmi sve fotografije
+      </button>
+    </div>
+
+    <div class="settings-group checkbox-row">
+      <label class="checkbox-label">
+        <input type="checkbox" id="showDedications">
+        <span class="custom-check"></span>
+        Prikaži posvete u slideshowu
+      </label>
+    </div>
+
+    <button class="btn-primary full-width" onclick="closeSettings()">
+      Spremi postavke
+    </button>
+
+  </div>
+</div>
+<div class="admin-navbar">
+
+  <div class="admin-nav-item active" onclick="switchAdminScreen('photos')">
+    <img src="gallery.png">
+  </div>
+
+  <div class="admin-nav-item" onclick="switchAdminScreen('dedications')">
+    <img src="message.png">
+  </div>
+
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+<script type="module" src="admin.js"></script>
+
+</body>
+</html>

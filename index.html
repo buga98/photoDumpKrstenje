@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+<title>PhotoDump M&L</title>
+
+<link rel="stylesheet" href="style.css">
+
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700&family=Poppins:wght@300;400;500&display=swap" rel="stylesheet">
+
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#e91e63">
+
+<link rel="apple-touch-icon" href="icon.png">
+</head>
+
+<body>
+
+<!-- floating slike -->
+<div class="floating-container"></div>
+
+<!-- top bar -->
+<div class="topbar">
+    ✨ Nika ✨
+</div>
+
+<!-- MAIN CARD -->
+<div class="center-wrapper">
+
+    <div class="glass-card">
+
+        <h1 onclick="secretAdminClick()">
+            ✨ Dobrodošli na poseban dan naše Nike ✨
+        </h1>
+
+      <p class="subtitle">
+            Dragi naši,<br><br>
+
+            hvala što ste danas s nama  
+            na dan svetog krštenja naše male Nike 🤍<br><br>
+
+            Podijelite svoje fotografije i uhvaćene trenutke  
+            kako bi ova predivna uspomena zauvijek ostala sa nama 📸<br><br>
+
+            Hvala vam na ljubavi, dolasku i blagoslovu ✨<br><br>
+
+            <span class="names">Nika 🤍</span>
+        </p>
+
+        <input type="text" id="name" placeholder="Tvoje ime i prezime">
+
+        <button onclick="enterApp()">Ulazak</button>
+
+    </div>
+
+</div>
+
+<!-- ADMIN MODAL -->
+<div id="adminModal" class="modal">
+  <div class="admin-modal-box">
+
+    <div class="modal-header">
+      <span>Admin pristup</span>
+      <span class="close-btn" onclick="closeAdminModal()">✖</span>
+    </div>
+
+    <input type="password" id="adminPass" placeholder="Unesi lozinku">
+
+    <button class="btn-primary" onclick="checkAdmin()">Ulaz</button>
+
+  </div>
+</div>
+
+<script type="module" src="script.js"></script>
+
+<script>
+window.addEventListener("load", () => {
+  document.body.classList.add("loaded");
+});
+
+// FLOATING SLIKE (mjehurići)
+document.addEventListener("DOMContentLoaded", () => {
+
+  const images = ["1.jpg","2.jpg","3.jpg","4.jpg","5.jpg","6.jpg"];
+  const container = document.querySelector(".floating-container");
+
+  images.forEach((imgSrc) => {
+
+    const el = document.createElement("div");
+    el.className = "bubble";
+
+    el.style.backgroundImage = `url(${imgSrc})`;
+
+    let x = Math.random() * window.innerWidth;
+    let y = Math.random() * window.innerHeight;
+
+    let dx = (Math.random() - 0.5) * 1.2;
+    let dy = (Math.random() - 0.5) * 1.2;
+
+    el.style.left = x + "px";
+    el.style.top = y + "px";
+
+    container.appendChild(el);
+
+    function move() {
+      x += dx;
+      y += dy;
+
+      if (x <= 0 || x >= window.innerWidth - 80) dx *= -1;
+      if (y <= 0 || y >= window.innerHeight - 80) dy *= -1;
+
+      el.style.left = x + "px";
+      el.style.top = y + "px";
+
+      requestAnimationFrame(move);
+    }
+
+    move();
+  });
+
+});
+</script>
+
+</body>
+</html>

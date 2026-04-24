@@ -1,0 +1,15 @@
+{
+  "name": "PhotoDump M&L",
+  "short_name": "PhotoDump",
+  "start_url": "/index.html",
+  "display": "standalone",
+  "background_color": "#ffe6f0",
+  "theme_color": "#e91e63",
+  "icons": [
+    {
+      "src": "icon.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    }
+  ]
+}
