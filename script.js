@@ -263,7 +263,7 @@ window.saveDedication = async function () {
   const name = localStorage.getItem("name");
 
   if (!text) {
-    alert("Upiši posvetu");
+    alert("Napiši poruku za Niku 🤍");
     return;
   }
 
@@ -380,12 +380,18 @@ window.createUser = async function (id, name) {
 
 /* ===== FILE UPLOAD ===== */
 window.uploadFile = async function (files) {
+
   const gallery = document.getElementById("gallery");
   if (!gallery) return;
 
   const user = localStorage.getItem("name");
 
+  showToast("Fotografije se učitavaju 📸");
+
+  let uploads = [];
+
   for (let file of files) {
+
     const wrapper = document.createElement("div");
     const progress = document.createElement("div");
     const img = document.createElement("img");
@@ -396,16 +402,96 @@ window.uploadFile = async function (files) {
     wrapper.appendChild(progress);
     gallery.appendChild(wrapper);
 
-    uploadToFirebase(file, user, (percent) => {
-      progress.style.width = percent + "%";
-    }).then((url) => {
-      img.src = url;
-      progress.remove();
+    const task = compressImage(file).then((compressedFile) => {
+
+      return uploadToFirebase(compressedFile, user, (percent) => {
+        progress.style.width = percent + "%";
+      }).then((url) => {
+        img.src = url;
+        progress.remove();
+      });
+
     });
+
+    uploads.push(task);
   }
 
-  showToast("Upload u tijeku 🚀");
+  // 🔥 čekaj sve uploadove
+  await Promise.all(uploads);
+
+  // 🔥 prebaci na profile
+  switchScreen("profile");
+
+  // 🔥 refresha galeriju
+  loadMyImages();
+
+  showToast("Upload završen 🤍");
 };
+
+function loadLiveCounters() {
+
+  const photoEl = document.getElementById("livePhotoCount");
+  const dedicationEl = document.getElementById("liveDedicationCount");
+
+  if (!photoEl || !dedicationEl) return;
+
+  onSnapshot(collection(db, "photos"), (snapshot) => {
+    photoEl.innerText = snapshot.size;
+  });
+
+  onSnapshot(collection(db, "dedications"), (snapshot) => {
+    dedicationEl.innerText = snapshot.size;
+  });
+}
+
+async function compressImage(file) {
+
+  return new Promise((resolve) => {
+
+    const reader = new FileReader();
+    const img = new Image();
+
+    reader.onload = (e) => {
+      img.src = e.target.result;
+    };
+
+    img.onload = () => {
+
+      let width = img.width;
+      let height = img.height;
+
+      const maxWidth = 1600;
+
+      if (width > maxWidth) {
+        height = height * (maxWidth / width);
+        width = maxWidth;
+      }
+
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+
+      canvas.width = width;
+      canvas.height = height;
+
+      ctx.drawImage(img, 0, 0, width, height);
+
+      canvas.toBlob((blob) => {
+
+        const newFile = new File(
+          [blob],
+          file.name.replace(/\.[^/.]+$/, "") + ".jpg",
+          { type: "image/jpeg" }
+        );
+
+        resolve(newFile);
+
+      }, "image/jpeg", 0.8);
+
+    };
+
+    reader.readAsDataURL(file);
+  });
+}
 
 /* ===== ADMIN LOGIN ===== */
 window.checkAdmin = function () {
@@ -430,4 +516,5 @@ function showToast(message) {
 /* ===== AUTO LOAD ===== */
 if (document.getElementById("feed")) {
   loadFeed();
+  loadLiveCounters();
 }
