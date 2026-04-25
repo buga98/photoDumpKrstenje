@@ -101,7 +101,8 @@ function loadFeed() {
   if (!feed || feedStarted) return;
 
   feedStarted = true;
-  
+
+  renderFeedSkeleton();
 
   const firstQuery = query(
     collection(db, "photos"),
@@ -110,7 +111,13 @@ function loadFeed() {
   );
 
   onSnapshot(firstQuery, (snapshot) => {
-    feed.innerHTML = "";
+
+    // briši skeleton SAMO PRVI PUT
+    if (feed.dataset.loaded !== "true") {
+      feed.innerHTML = "";
+      feed.dataset.loaded = "true";
+    }
+
     if (!snapshot.empty) {
       lastVisiblePhoto = snapshot.docs[snapshot.docs.length - 1];
     }
@@ -120,7 +127,6 @@ function loadFeed() {
     });
 
     createFeedObserver(feed);
-    //hideLoader();
   });
 }
 
@@ -820,7 +826,6 @@ document.addEventListener("touchend", function(e) {
 }, { passive: false });
 /* ===== AUTO LOAD ===== */
 if (document.getElementById("feed")) {
-  renderFeedSkeleton();
   loadFeed();
   loadLiveCounters();
 }
