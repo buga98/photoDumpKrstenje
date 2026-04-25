@@ -79,13 +79,29 @@ const renderedPhotos = new Map();
 function saveLikedCache() {
   localStorage.setItem("likedPhotos", JSON.stringify([...likedCache]));
 }
+function renderFeedSkeleton() {
+  const feed = document.getElementById("feed");
+  if (!feed) return;
 
+  feed.innerHTML = "";
+
+  for (let i = 0; i < 6; i++) {
+    const card = document.createElement("div");
+    card.className = "feed-card skeleton-card";
+
+    card.innerHTML = `
+      <img src="ucitavanje.png" class="skeleton-img">
+    `;
+
+    feed.appendChild(card);
+  }
+}
 function loadFeed() {
   const feed = document.getElementById("feed");
   if (!feed || feedStarted) return;
 
   feedStarted = true;
-  feed.innerHTML = "";
+  
 
   const firstQuery = query(
     collection(db, "photos"),
@@ -94,6 +110,7 @@ function loadFeed() {
   );
 
   onSnapshot(firstQuery, (snapshot) => {
+    feed.innerHTML = "";
     if (!snapshot.empty) {
       lastVisiblePhoto = snapshot.docs[snapshot.docs.length - 1];
     }
@@ -776,16 +793,7 @@ window.checkAdmin = function () {
     alert("Kriva šifra");
   }
 };
-function hideLoader() {
-  const loader = document.getElementById("loader");
-  if (!loader) return;
 
-  loader.classList.add("hide");
-
-  setTimeout(() => {
-    loader.remove();
-  }, 400);
-}
 /* ===== TOAST ===== */
 function showToast(message) {
   const toast = document.getElementById("toast");
@@ -809,6 +817,7 @@ document.addEventListener("touchend", function(e) {
 }, { passive: false });
 /* ===== AUTO LOAD ===== */
 if (document.getElementById("feed")) {
+  renderFeedSkeleton();
   loadFeed();
   loadLiveCounters();
-};
+}
