@@ -120,7 +120,7 @@ function loadFeed() {
     });
 
     createFeedObserver(feed);
-    hideLoader();
+    //hideLoader();
   });
 }
 
