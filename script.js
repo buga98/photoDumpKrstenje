@@ -1,8 +1,13 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
-import { getFirestore, onSnapshot, orderBy, doc, setDoc, addDoc, collection, getDoc, getDocs, query, where, deleteDoc,updateDoc,increment,limit,startAfter } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
-import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-storage.js";
+import { 
+  getFirestore, onSnapshot, orderBy, doc, setDoc, addDoc, collection, 
+  getDoc, getDocs, query, where, deleteDoc, updateDoc, increment, limit 
+} from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
+import { 
+  getStorage, ref, uploadBytesResumable, getDownloadURL 
+} from "https://www.gstatic.com/firebasejs/12.11.0/firebase-storage.js";
 
-/* ===== FIREBASE ===== */
+/* ===== FIREBASE KONFIGURACIJA ===== */
 const firebaseConfig = {
   apiKey: "AIzaSyA3qAy-Ij6yPvOcfEvzguTak4CJCc1a5UU",
   authDomain: "photodumpkrstenje.firebaseapp.com",
@@ -16,831 +21,260 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const storage = getStorage(app);
 
-/* ===== ENTER APP ===== */
+let currentUser = localStorage.getItem("userName") || "";
+let pressTimer; 
+let tapTimer = null;
+
+/* ===== INICIJALIZACIJA ===== */
+window.onload = () => {
+    if (currentUser) {
+        document.getElementById("welcome").innerText = currentUser;
+        document.getElementById("loginScreen").classList.remove("active");
+        document.getElementById("appScreen").classList.add("active");
+        loadLiveCounters();
+        loadFeed();
+    }
+};
+
 window.enterApp = function () {
-  const name = document.getElementById("name").value.trim();
+  const nameInput = document.getElementById("userName");
+  const name = nameInput.value.trim();
+  if (!name) return showToast("Unesi svoje ime 🕊️");
 
-  if (!name) {
-    alert("Upiši ime i prezime");
-    return;
-  }
-
-  let userId = localStorage.getItem("userId");
-
-  if (!userId) {
-    userId = crypto.randomUUID();
-    localStorage.setItem("userId", userId);
-  }
-
-  localStorage.setItem("name", name);
-
-  createUser(userId, name);
-
-  window.location.href = "/app";
+  currentUser = name;
+  localStorage.setItem("userName", name);
+  
+  document.getElementById("welcome").innerText = name;
+  document.getElementById("loginScreen").classList.remove("active");
+  document.getElementById("appScreen").classList.add("active");
+  
+  loadLiveCounters();
+  loadFeed();
 };
-async function likePhoto(userLikeRef, photoId, card) {
 
-  const checkSnap = await getDoc(userLikeRef);
-
-  if (checkSnap.exists()) {
-    showBigHeart(card); // animacija smije
-    return false;
-  }
-
-  showBigHeart(card); // odmah
-
-  await setDoc(userLikeRef, {
-    created: Date.now()
-  });
-
-  await updateDoc(doc(db, "photos", photoId), {
-    likes: increment(1)
-  });
-
-  return true;
-}
-/* ===== LIVE FEED ===== */
-// GLOBAL CACHE (stavi jednom gore u script.js)
-// ==========================================
-// ULTRA FAST FEED (CACHE + LIVE FIRESTORE)
-// ==========================================
-
-/* ===== LIVE FEED ===== */
-
-const FEED_PAGE_SIZE = 24;
-const likedCache = new Set(JSON.parse(localStorage.getItem("likedPhotos") || "[]"));
-
-let feedStarted = false;
-let lastVisiblePhoto = null;
-let isLoadingMore = false;
-let hasMorePhotos = true;
-const renderedPhotos = new Map();
-
-function saveLikedCache() {
-  localStorage.setItem("likedPhotos", JSON.stringify([...likedCache]));
-}
-function renderFeedSkeleton() {
-  const feed = document.getElementById("feed");
-  if (!feed) return;
-
-  feed.innerHTML = "";
-
-  for (let i = 0; i < 6; i++) {
-    const card = document.createElement("div");
-    card.className = "feed-card skeleton-card";
-
-    card.innerHTML = `
-      <img src="ucitavanje.png" class="skeleton-img">
-    `;
-
-    feed.appendChild(card);
-  }
-}
-function loadFeed() {
-  const feed = document.getElementById("feed");
-  if (!feed || feedStarted) return;
-
-  feedStarted = true;
-
-  renderFeedSkeleton();
-
-  const firstQuery = query(
-    collection(db, "photos"),
-    orderBy("created", "desc"),
-    limit(FEED_PAGE_SIZE)
-  );
-
-  onSnapshot(firstQuery, (snapshot) => {
-
-    // briši skeleton SAMO PRVI PUT
-    if (feed.dataset.loaded !== "true") {
-      feed.innerHTML = "";
-      feed.dataset.loaded = "true";
-    }
-
-    if (!snapshot.empty) {
-      lastVisiblePhoto = snapshot.docs[snapshot.docs.length - 1];
-    }
-
-    snapshot.docChanges().forEach((change) => {
-      renderFeedChange(change, feed, true);
-    });
-
-    createFeedObserver(feed);
-  });
-}
-
-function renderFeedChange(change, feed, isLiveTop = false) {
-  const docSnap = change.doc;
-  const data = docSnap.data();
-  const photoId = docSnap.id;
-
-  if (change.type === "removed" || data.visible === false) {
-    const existing = renderedPhotos.get(photoId);
-    if (existing) {
-      existing.remove();
-      renderedPhotos.delete(photoId);
-    }
-    return;
-  }
-
-  if (change.type === "modified") {
-    const existing = renderedPhotos.get(photoId);
-    if (existing) {
-      const countEl = existing.querySelector(".like-count");
-      if (countEl) countEl.innerText = data.likes || 0;
-    }
-    return;
-  }
-
-  if (renderedPhotos.has(photoId)) return;
-
-  const card = createFeedCard(photoId, data);
-  renderedPhotos.set(photoId, card);
-
-  if (isLiveTop) {
-    feed.prepend(card);
-  } else {
-    feed.appendChild(card);
-  }
-}
-async function resizeImage(file, maxWidth, quality) {
-  return new Promise((resolve) => {
-    const reader = new FileReader();
-    const img = new Image();
-
-    reader.onload = (e) => img.src = e.target.result;
-
-    img.onload = () => {
-
-      let width = img.width;
-      let height = img.height;
-
-      if (width > maxWidth) {
-        height = height * (maxWidth / width);
-        width = maxWidth;
-      }
-
-      const canvas = document.createElement("canvas");
-      const ctx = canvas.getContext("2d");
-
-      canvas.width = width;
-      canvas.height = height;
-
-      ctx.drawImage(img, 0, 0, width, height);
-
-      canvas.toBlob((blob) => {
-        const newFile = new File(
-          [blob],
-          file.name.replace(/\.[^/.]+$/, "") + ".jpg",
-          { type: "image/jpeg" }
-        );
-
-        resolve(newFile);
-
-      }, "image/jpeg", quality);
-
-    };
-
-    reader.readAsDataURL(file);
-  });
-}
-function createFeedCard(photoId, data) {
-  const userId = localStorage.getItem("userId");
-
-  const card = document.createElement("div");
-  card.className = "feed-card";
-  card.dataset.id = photoId;
-  card.dataset.full = data.imageUrl;
-
-  const img = document.createElement("img");
-  img.src = data.thumbUrl || data.imageUrl;
-  img.loading = "lazy";
-  img.decoding = "async";
-
-  img.onload = () => {
-    img.classList.add("loaded");
-  };
-
-  const likeBox = document.createElement("div");
-  likeBox.className = "like-box";
-
-  const isLiked = likedCache.has(photoId);
-
-  likeBox.innerHTML = `
-    <span class="heart ${isLiked ? "liked" : ""}">❤️</span>
-    <span class="like-count">${data.likes || 0}</span>
-  `;
-
-  const heartEl = likeBox.querySelector(".heart");
-
-  async function doLike() {
-    showBigHeart(card);
-
-    if (likedCache.has(photoId)) return;
-
-    const userLikeRef = doc(db, "photos", photoId, "likes", userId);
-
-    const checkSnap = await getDoc(userLikeRef);
-
-    if (checkSnap.exists()) {
-      likedCache.add(photoId);
-      saveLikedCache();
-      heartEl.classList.add("liked");
-      return;
-    }
-
-    likedCache.add(photoId);
-    saveLikedCache();
-    heartEl.classList.add("liked");
-
-    await setDoc(userLikeRef, {
-      created: Date.now()
-    });
-
-    await updateDoc(doc(db, "photos", photoId), {
-      likes: increment(1)
-    });
-  }
-
-  likeBox.onclick = (e) => {
-    e.stopPropagation();
-    doLike();
-  };
-
+/* ===== 1. & 2. KLIK (FULLSCREEN) I DOUBLE-TAP (LIKE) ===== */
+function setupInteractions(card, photoData) {
+  const img = card.querySelector("img");
   let lastTap = 0;
-  let tapTimer = null;
 
-  img.addEventListener("touchend", (e) => {
+  // Touch/Click logika za mobitele i PC
+  img.addEventListener('click', (e) => {
     const now = Date.now();
-    const diff = now - lastTap;
+    const DOUBLE_PRESS_DELAY = 300;
 
-    if (diff < 300 && diff > 0) {
+    if ((now - lastTap) < DOUBLE_PRESS_DELAY) {
+      // DOUBLE TAP -> LIKE
       clearTimeout(tapTimer);
-      doLike();
-      lastTap = 0;
+      doLike(photoData.id, card);
     } else {
-      lastTap = now;
-
+      // SINGLE TAP -> FULLSCREEN (sa malom odgodom)
       tapTimer = setTimeout(() => {
-        openFullscreen(data.imageUrl);
-      }, 310);
+        openFullscreen(photoData.url);
+      }, DOUBLE_PRESS_DELAY);
     }
+    lastTap = now;
   });
-
-img.addEventListener("click", () => {
-  openFullscreen(data.imageUrl);
-});
-
-  card.appendChild(img);
-  card.appendChild(likeBox);
-
-  return card;
 }
 
-function createFeedObserver(feed) {
-  if (document.getElementById("feedSentinel")) return;
-
-  const sentinel = document.createElement("div");
-  sentinel.id = "feedSentinel";
-  sentinel.style.height = "40px";
-  feed.after(sentinel);
-
-  const observer = new IntersectionObserver((entries) => {
-    if (entries[0].isIntersecting) {
-      loadMoreFeedPhotos(feed);
-    }
-  }, {
-    rootMargin: "300px"
-  });
-
-  observer.observe(sentinel);
+function openFullscreen(url) {
+  const overlay = document.createElement("div");
+  overlay.className = "fullscreen-overlay active";
+  overlay.innerHTML = `
+    <div class="close-fs" onclick="this.parentElement.remove()">✕</div>
+    <img src="${url}" style="max-width:100%; max-height:100vh; object-fit:contain;">
+  `;
+  overlay.onclick = (e) => { if(e.target === overlay) overlay.remove(); };
+  document.body.appendChild(overlay);
 }
 
-async function loadMoreFeedPhotos(feed) {
-  if (isLoadingMore || !hasMorePhotos || !lastVisiblePhoto) return;
-
-  isLoadingMore = true;
-
-  const nextQuery = query(
-    collection(db, "photos"),
-    orderBy("created", "desc"),
-    startAfter(lastVisiblePhoto),
-    limit(FEED_PAGE_SIZE)
-  );
-
-  const snapshot = await getDocs(nextQuery);
-
-  if (snapshot.empty) {
-    hasMorePhotos = false;
-    isLoadingMore = false;
-    return;
-  }
-
-  lastVisiblePhoto = snapshot.docs[snapshot.docs.length - 1];
-
-  const fragment = document.createDocumentFragment();
-
-  snapshot.forEach((docSnap) => {
-    const data = docSnap.data();
-    if (data.visible === false) return;
-
-    const photoId = docSnap.id;
-    if (renderedPhotos.has(photoId)) return;
-
-    const card = createFeedCard(photoId, data);
-    renderedPhotos.set(photoId, card);
-    fragment.appendChild(card);
-  });
-
-  feed.appendChild(fragment);
-  isLoadingMore = false;
-}
-function showBigHeart(parent) {
-  const heart = document.createElement("div");
-  heart.className = "big-heart";
-  heart.innerText = "❤️";
-
-  parent.appendChild(heart);
-
-  setTimeout(() => {
-    heart.remove();
-  }, 900);
-}
-
-/* ===== DELETE ===== */
-let selectedPhotoId = null;
-
-window.confirmDelete = async function () {
-  document.getElementById("deleteModal").style.display = "none";
-
-  const docRef = doc(db, "photos", selectedPhotoId);
-
-  // 🔥 BRŽE
-  const snap = await getDoc(docRef);
-  const imageUrl = snap.exists() ? snap.data().imageUrl : null;
-
-  if (imageUrl) {
-    try {
-      const imageRef = ref(storage, imageUrl);
-      await deleteObject(imageRef);
-    } catch (e) {
-      console.log("Storage delete fail:", e);
-    }
-  }
-
-  await deleteDoc(docRef);
-  loadMyImages();
-};
-
-window.closeDelete = function () {
-  document.getElementById("deleteModal").style.display = "none";
-};
-
-function openFullscreen(url, startIndex = null) {
-
-  const full = document.createElement("div");
-  full.className = "admin-fullscreen";
-
-  const img = document.createElement("img");
-  img.className = "admin-fullscreen-img";
-
-  full.appendChild(img);
-  document.body.appendChild(full);
-  document.body.classList.add("fullscreen-open");
-
-  let photos = [...renderedPhotos.keys()];
-  let index = startIndex !== null ? startIndex : 0;
-
-  if (!photos.length) {
-    img.src = url;
-  } else {
-const currentId = [...renderedPhotos.entries()]
-  .find(([id, el]) => el.dataset.full === url);
-
-    index = photos.indexOf(currentId?.[0]);
-
-if (index < 0) index = 0;
-  }
-
-function render() {
-  const id = photos[index];
-  if (!id) return;
-
-  const card = renderedPhotos.get(id);
-  if (!card) return;
-
-  img.src = card.dataset.full;
-}
-
-  let startX = 0;
-  let startY = 0;
-
-  full.addEventListener("touchstart", (e) => {
-    startX = e.touches[0].clientX;
-    startY = e.touches[0].clientY;
-  }, { passive:true });
-
-full.addEventListener("touchend", (e) => {
-  const endX = e.changedTouches[0].clientX;
-  const endY = e.changedTouches[0].clientY;
-
-  const diffX = startX - endX;
-  const diffY = startY - endY;
-
-  const absX = Math.abs(diffX);
-  const absY = Math.abs(diffY);
-
-  // 👉 SWIPE LIJEVO / DESNO
-  if (absX > absY && absX > 50) {
-
-    if (diffX > 0) {
-      index = (index + 1) % photos.length;
-    } else {
-      index = (index - 1 + photos.length) % photos.length;
-    }
-
-    render();
-    return;
-  }
-
-  // 👉 SWIPE GORE / DOLJE = close
-  if (absY > absX && absY > 90) {
-    document.body.classList.remove("fullscreen-open");
-full.remove();
-    return;
-  }
-if (absX < 10 && absY < 10) {
-   document.body.classList.remove("fullscreen-open");
-full.remove();
-   return;
-}
-  // 👉 mali tap = ništa
-});
-
-  full.onclick = (e) => {
-    if (e.target === full) 
-      document.body.classList.remove("fullscreen-open");
-full.remove();
+/* ===== 3. LONG PRESS ZA BRISANJE (Samo na "Moje Slike") ===== */
+function setupLongPress(card, photoId) {
+  const start = (e) => {
+    pressTimer = setTimeout(() => {
+      confirmDeletion(photoId);
+    }, 800);
   };
+  const stop = () => clearTimeout(pressTimer);
 
-  render();
+  card.addEventListener('mousedown', start);
+  card.addEventListener('touchstart', start);
+  card.addEventListener('mouseup', stop);
+  card.addEventListener('mouseleave', stop);
+  card.addEventListener('touchend', stop);
 }
 
-/* ===== PUBLIC GALLERY ===== */
-window.openGallery = async function () {
-  document.getElementById("galleryModal").style.display = "flex";
-
-  const gallery = document.getElementById("publicGallery");
-  gallery.innerHTML = "Učitavanje...";
-
-  const snapshot = await getDocs(collection(db, "photos"));
-  gallery.innerHTML = "";
-
-  snapshot.forEach(doc => {
-    const data = doc.data();
-
-    if (data.visible === false) return;
-    if (data.type === "video") return;
-
-    const img = document.createElement("img");
-    img.src = data.thumbUrl || data.imageUrl;
-    img.onclick = () => openFullscreen(data.imageUrl);
-
-    gallery.appendChild(img);
-  });
-};
-
-window.closeGallery = function () {
-  document.getElementById("galleryModal").style.display = "none";
-};
-
-/* ===== NAVIGATION ===== */
-window.switchScreen = function (screen) {
-  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
-  document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
-
-  if (screen === "home") {
-    document.getElementById("homeTab").classList.add("active");
-    document.querySelectorAll(".nav-item")[0].classList.add("active");
-  }
-
-  if (screen === "upload") {
-    document.getElementById("uploadTab").classList.add("active");
-    document.querySelectorAll(".nav-item")[1].classList.add("active");
-  }
-
-  if (screen === "profile") {
-    document.getElementById("profileTab").classList.add("active");
-    document.querySelectorAll(".nav-item")[2].classList.add("active");
-
-    loadMyImages();
-  }
-};
-
-/* ===== UPLOAD ===== */
-window.uploadToFirebase = function (file, user, onProgress) {
-  return new Promise(async (resolve, reject) => {
-
-    try {
-
-      const bigFile = await resizeImage(file, 1600, 0.8);
-      const thumbFile = await resizeImage(file, 450, 0.65);
-
-      // BIG
-      const bigRef = ref(storage, 'photos/' + Date.now() + '_' + file.name);
-      const uploadTask = uploadBytesResumable(bigRef, bigFile);
-
-      uploadTask.on(
-        "state_changed",
-        (snapshot) => {
-          const percent =
-            (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-
-          if (onProgress) onProgress(percent);
-        },
-        reject,
-        async () => {
-
-          const imageUrl = await getDownloadURL(uploadTask.snapshot.ref);
-
-          // THUMB
-          const thumbRef = ref(storage, 'thumbs/' + Date.now() + '_' + file.name);
-
-          await uploadBytesResumable(thumbRef, thumbFile);
-
-          const thumbUrl = await getDownloadURL(thumbRef);
-
-          await addDoc(collection(db, "photos"), {
-            imageUrl,
-            thumbUrl,
-            user,
-            userId: localStorage.getItem("userId"),
-            created: Date.now(),
-            likes: 0
-          });
-
-          resolve(imageUrl);
+async function confirmDeletion(id) {
+    if (confirm("Želiš li trajno ukloniti ovu sliku iz galerije?")) {
+        try {
+            await updateDoc(doc(db, "photos", id), { visible: false });
+            showToast("Slika uklonjena");
+            loadMyImages(); // Osvježi profil
+        } catch (e) {
+            console.error(e);
         }
-      );
-
-    } catch (err) {
-      reject(err);
     }
-  });
-};
-
-/* ===== ADMIN ===== */
-let clickCount = 0;
-
-window.secretAdminClick = function () {
-  clickCount++;
-
-  if (clickCount === 3) {
-    openAdminModal();
-    clickCount = 0;
-  }
-
-  setTimeout(() => clickCount = 0, 1000);
-};
-
-window.openAdminModal = function () {
-  document.getElementById("adminModal").style.display = "flex";
-};
-
-window.closeAdminModal = function () {
-  document.getElementById("adminModal").style.display = "none";
-};
-
-/* sigurniji click */
-window.addEventListener("click", function (e) {
-  const modal = document.getElementById("adminModal");
-  if (e.target === modal) modal.style.display = "none";
-});
-
-/* ===== DEDICATION ===== */
-window.saveDedication = async function () {
-  const text = document.getElementById("dedicationText").value.trim();
-  const name = localStorage.getItem("name");
-
-  if (!text) {
-    alert("Napiši poruku za Niku 🤍");
-    return;
-  }
-
-  await addDoc(collection(db, "dedications"), {
-    name,
-    text,
-    created: Date.now() // 🔥 FIX
-  });
-
-  document.getElementById("dedicationText").value = "";
-  showSuccessModal();
-};
-
-window.showSuccessModal = function () {
-  document.getElementById("successModal").style.display = "flex";
-};
-
-window.closeSuccessModal = function () {
-  document.getElementById("successModal").style.display = "none";
-};
-
-/* ===== PROFILE ===== */
-window.loadMyImages = async function () {
-  const gallery = document.getElementById("gallery");
-  const name = localStorage.getItem("name");
-
-  if (!gallery) return;
-
-  gallery.innerHTML = "<p style='grid-column:1/-1; opacity:0.6;'>Učitavam...</p>";
-
-  try {
-    const q = query(
-      collection(db, "photos"),
-      where("user", "==", name)
-    );
-
-    const snapshot = await getDocs(q);
-
-    gallery.innerHTML = "";
-
-    if (snapshot.empty) {
-      gallery.innerHTML = "<p style='grid-column:1/-1; opacity:0.6;'>Nema još tvojih slika 📸</p>";
-      return;
-    }
-
-    snapshot.forEach((docSnap) => {
-      const data = docSnap.data();
-
-      const img = document.createElement("img");
-      img.src = data.thumbUrl || data.imageUrl;
-
-      let pressTimer;
-      let isLongPress = false;
-
-      /* ===== TOUCH START ===== */
-      img.addEventListener("touchstart", () => {
-        isLongPress = false;
-
-        pressTimer = setTimeout(() => {
-          isLongPress = true;
-          selectedPhotoId = docSnap.id;
-
-          document.getElementById("deleteModal").style.display = "flex";
-
-          // 🔥 optional vibracija
-          if (navigator.vibrate) navigator.vibrate(50);
-        }, 700);
-      });
-
-      /* ===== TOUCH END ===== */
-      img.addEventListener("touchend", () => {
-        clearTimeout(pressTimer);
-      });
-
-      /* ===== CLICK ===== */
-      img.addEventListener("click", () => {
-        if (!isLongPress) {
-          openFullscreen(data.imageUrl);
-        }
-      });
-
-      /* ===== CANCEL ===== */
-      img.addEventListener("touchmove", () => clearTimeout(pressTimer));
-      img.addEventListener("mouseleave", () => clearTimeout(pressTimer));
-
-      gallery.appendChild(img);
-    });
-
-  } catch (err) {
-    console.error(err);
-    gallery.innerHTML = "<p style='grid-column:1/-1;'>Greška pri učitavanju</p>";
-  }
-};
-
-/* ===== USER ===== */
-const user = localStorage.getItem("name");
-const welcomeEl = document.getElementById("welcome");
-
-if (!user && !window.location.pathname.includes("index.html")) {
-  window.location.href = "/";
 }
 
-if (user && welcomeEl) {
-  welcomeEl.innerText = "Pozdrav, " + user;
-}
-
-/* ===== CREATE USER ===== */
-window.createUser = async function (id, name) {
-  await setDoc(doc(db, "users", id), {
-    name,
-    created: Date.now()
-  });
-};
-
-/* ===== FILE UPLOAD ===== */
-window.uploadFile = async function (files) {
-
-  const gallery = document.getElementById("gallery");
-  if (!gallery) return;
-
-  const user = localStorage.getItem("name");
-
-  showToast("Fotografije se učitavaju 📸");
-
-  let uploads = [];
+/* ===== 4. UPLOAD (SLIKE I POSVETE) ===== */
+window.uploadFile = async function(files) {
+  if (!files.length) return;
+  
+  const label = document.querySelector(".upload-label");
+  const text = document.querySelector(".upload-text");
+  
+  label.style.opacity = "0.5";
+  text.innerText = "Slanje u oblake...";
 
   for (let file of files) {
-
-    const wrapper = document.createElement("div");
-    const progress = document.createElement("div");
-    const img = document.createElement("img");
-
-    img.src = URL.createObjectURL(file);
-
-    wrapper.appendChild(img);
-    wrapper.appendChild(progress);
-    gallery.appendChild(wrapper);
-
-const task = uploadToFirebase(file, user, (percent) => {
-  progress.style.width = percent + "%";
-}).then((url) => {
-  img.src = url;
-  progress.remove();
-});
-
-    uploads.push(task);
+    const fileName = `${Date.now()}_${currentUser}_${file.name}`;
+    const storageRef = ref(storage, `photos/${fileName}`);
+    
+    try {
+        const uploadTask = await uploadBytesResumable(storageRef, file);
+        const url = await getDownloadURL(uploadTask.ref);
+        
+        await addDoc(collection(db, "photos"), {
+            url: url,
+            user: currentUser,
+            likes: 0,
+            visible: true,
+            timestamp: new Date()
+        });
+    } catch (err) {
+        showToast("Greška pri uploadu!");
+    }
   }
 
-  // 🔥 čekaj sve uploadove
-  await Promise.all(uploads);
-
-  // 🔥 prebaci na profile
-  switchScreen("profile");
-
-  // 🔥 refresha galeriju
-  loadMyImages();
-
-  showToast("Upload završen 🤍");
+  text.innerText = "Uspješno poslano! ✨";
+  label.style.opacity = "1";
+  setTimeout(() => { text.innerText = "Odaberi slike"; }, 3000);
+  loadFeed(); 
 };
 
-function loadLiveCounters() {
+window.saveDedication = async function() {
+  const input = document.getElementById("dedicationText");
+  const msg = input.value.trim();
+  
+  if (!msg) return showToast("Napiši nešto lijepo... ✍️");
 
-  const photoEl = document.getElementById("livePhotoCount");
-  const dedicationEl = document.getElementById("liveDedicationCount");
-  const likesEl = document.getElementById("liveLikesCount");
-
-  if (!photoEl || !dedicationEl) return;
-
-  onSnapshot(collection(db, "photos"), (snapshot) => {
-
-    let photoCount = 0;
-    let likesTotal = 0;
-
-    snapshot.forEach((docSnap) => {
-      const data = docSnap.data();
-
-      if (data.visible === false) return;
-
-      photoCount++;
-      likesTotal += data.likes || 0;
-    });
-
-    photoEl.innerText = photoCount;
-
-    if (likesEl) {
-      likesEl.innerText = likesTotal;
-    }
+  await addDoc(collection(db, "dedications"), {
+    text: msg,
+    user: currentUser,
+    timestamp: new Date()
   });
 
-  onSnapshot(collection(db, "dedications"), (snapshot) => {
-    dedicationEl.innerText = snapshot.size;
+  input.value = "";
+  showToast("Posveta spremljena! 🤍");
+};
+
+/* ===== FIREBASE OPTIMIZACIJA (Štednja budžeta) ===== */
+async function loadLiveCounters() {
+  // Umjesto onSnapshot (koji troši stalno), ovo zovemo samo pri ulasku
+  const photoSnap = await getDocs(query(collection(db, "photos"), where("visible", "==", true)));
+  const dedSnap = await getDocs(collection(db, "dedications"));
+  
+  document.getElementById("livePhotoCount").innerText = photoSnap.size;
+  document.getElementById("liveDedicationCount").innerText = dedSnap.size;
+}
+
+async function loadFeed() {
+  const container = document.getElementById("feedContainer");
+  container.innerHTML = "<p style='text-align:center; opacity:0.5;'>Učitavam uspomene...</p>";
+
+  const q = query(
+      collection(db, "photos"), 
+      where("visible", "==", true), 
+      orderBy("timestamp", "desc"), 
+      limit(50) // Limitiramo na 50 slika radi brzine i uštede
+  );
+
+  const querySnapshot = await getDocs(q);
+  container.innerHTML = "";
+
+  querySnapshot.forEach((docSnap) => {
+    const data = docSnap.data();
+    data.id = docSnap.id;
+    const card = createPhotoCard(data);
+    container.appendChild(card);
+    setupInteractions(card, data);
   });
 }
 
-/* ===== ADMIN LOGIN ===== */
+async function loadMyImages() {
+    const container = document.getElementById("gallery");
+    container.innerHTML = "";
+    
+    const q = query(collection(db, "photos"), where("user", "==", currentUser), where("visible", "==", true));
+    const snap = await getDocs(q);
+
+    snap.forEach(docSnap => {
+        const data = docSnap.data();
+        data.id = docSnap.id;
+        const card = createPhotoCard(data);
+        container.appendChild(card);
+        setupLongPress(card, data.id);
+    });
+}
+
+function createPhotoCard(data) {
+  const div = document.createElement("div");
+  div.className = "feed-card";
+  div.innerHTML = `
+    <img src="${data.url}" loading="lazy" onload="this.classList.add('loaded')">
+    <div class="card-info">
+      <span class="author">👤 ${data.user}</span>
+      <span class="likes-count">❤️ ${data.likes || 0}</span>
+    </div>
+  `;
+  return div;
+}
+
+async function doLike(id, card) {
+  const storageKey = `liked_${id}`;
+  if (localStorage.getItem(storageKey)) return;
+
+  const docRef = doc(db, "photos", id);
+  await updateDoc(docRef, { likes: increment(1) });
+  localStorage.setItem(storageKey, "true");
+
+  // Srce animacija
+  const heart = document.createElement("div");
+  heart.className = "big-heart";
+  heart.innerHTML = "❤️";
+  card.appendChild(heart);
+  setTimeout(() => heart.remove(), 800);
+
+  // Update brojača na ekranu
+  const countEl = card.querySelector(".likes-count");
+  let current = parseInt(countEl.innerText.replace("❤️ ", ""));
+  countEl.innerText = `❤️ ${current + 1}`;
+}
+
+/* ===== POMOĆNE FUNKCIJE ===== */
+window.switchScreen = function (screenId) {
+  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+  document.getElementById(screenId + "Tab").classList.add("active");
+  
+  document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
+  event.currentTarget.classList.add("active");
+
+  if (screenId === "profile") loadMyImages();
+  if (screenId === "home") loadFeed();
+};
+
+function showToast(text) {
+    const t = document.createElement("div");
+    t.className = "toast";
+    t.innerText = text;
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 3000);
+}
+
 window.checkAdmin = function () {
   const pass = document.getElementById("adminPass").value;
-
-  if (pass === "admin") {
-    window.location.href = "/admin";
+  if (pass === "admin123") { // Promijeni ovo!
+    window.location.href = "admin.html";
   } else {
-    alert("Kriva šifra");
+    alert("Kriva lozinka!");
   }
 };
-
-/* ===== TOAST ===== */
-function showToast(message) {
-  const toast = document.getElementById("toast");
-  toast.innerText = message;
-  toast.classList.add("show");
-
-  setTimeout(() => toast.classList.remove("show"), 2000);
-}
-
-/* ===== AUTO LOAD ===== */
-if (document.getElementById("feed")) {
-  loadFeed();
-  loadLiveCounters();
-}
