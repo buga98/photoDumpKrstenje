@@ -25,14 +25,18 @@ window.enterApp = function () {
     return;
   }
 
-  const userId = Date.now().toString();
+  let userId = localStorage.getItem("userId");
 
-  localStorage.setItem("userId", userId);
+  if (!userId) {
+    userId = crypto.randomUUID();
+    localStorage.setItem("userId", userId);
+  }
+
   localStorage.setItem("name", name);
 
   createUser(userId, name);
 
-  window.location.href = "app.html";
+  window.location.href = "/app";
 };
 async function likePhoto(userLikeRef, photoId, card) {
 
@@ -397,7 +401,7 @@ window.openGallery = async function () {
     if (data.type === "video") return;
 
     const img = document.createElement("img");
-    img.src = data.imageUrl;
+    img.src = data.thumbUrl || data.imageUrl;
     img.onclick = () => openFullscreen(data.imageUrl);
 
     gallery.appendChild(img);
@@ -567,7 +571,7 @@ window.loadMyImages = async function () {
       const data = docSnap.data();
 
       const img = document.createElement("img");
-      img.src = data.imageUrl;
+      img.src = data.thumbUrl || data.imageUrl;
 
       let pressTimer;
       let isLongPress = false;
@@ -617,7 +621,7 @@ const user = localStorage.getItem("name");
 const welcomeEl = document.getElementById("welcome");
 
 if (!user && !window.location.pathname.includes("index.html")) {
-  window.location.href = "index.html";
+  window.location.href = "/";
 }
 
 if (user && welcomeEl) {
@@ -656,16 +660,12 @@ window.uploadFile = async function (files) {
     wrapper.appendChild(progress);
     gallery.appendChild(wrapper);
 
-    const task = compressImage(file).then((compressedFile) => {
-
-      return uploadToFirebase(compressedFile, user, (percent) => {
-        progress.style.width = percent + "%";
-      }).then((url) => {
-        img.src = url;
-        progress.remove();
-      });
-
-    });
+const task = uploadToFirebase(file, user, (percent) => {
+  progress.style.width = percent + "%";
+}).then((url) => {
+  img.src = url;
+  progress.remove();
+});
 
     uploads.push(task);
   }
@@ -716,61 +716,61 @@ function loadLiveCounters() {
   });
 }
 
-async function compressImage(file) {
-
-  return new Promise((resolve) => {
-
-    const reader = new FileReader();
-    const img = new Image();
-
-    reader.onload = (e) => {
-      img.src = e.target.result;
-    };
-
-    img.onload = () => {
-
-      let width = img.width;
-      let height = img.height;
-
-      const maxWidth = 1600;
-
-      if (width > maxWidth) {
-        height = height * (maxWidth / width);
-        width = maxWidth;
-      }
-
-      const canvas = document.createElement("canvas");
-      const ctx = canvas.getContext("2d");
-
-      canvas.width = width;
-      canvas.height = height;
-
-      ctx.drawImage(img, 0, 0, width, height);
-
-      canvas.toBlob((blob) => {
-
-        const newFile = new File(
-          [blob],
-          file.name.replace(/\.[^/.]+$/, "") + ".jpg",
-          { type: "image/jpeg" }
-        );
-
-        resolve(newFile);
-
-      }, "image/jpeg", 0.8);
-
-    };
-
-    reader.readAsDataURL(file);
-  });
-}
+//async function compressImage(file) {
+//
+//  return new Promise((resolve) => {
+//
+//    const reader = new FileReader();
+//    const img = new Image();
+//
+//    reader.onload = (e) => {
+//      img.src = e.target.result;
+//    };
+//
+//    img.onload = () => {
+//
+//      let width = img.width;
+//      let height = img.height;
+//
+//      const maxWidth = 1600;
+//
+//      if (width > maxWidth) {
+//        height = height * (maxWidth / width);
+//        width = maxWidth;
+//      }
+//
+//      const canvas = document.createElement("canvas");
+//      const ctx = canvas.getContext("2d");
+//
+//      canvas.width = width;
+//      canvas.height = height;
+//
+//      ctx.drawImage(img, 0, 0, width, height);
+//
+//      canvas.toBlob((blob) => {
+//
+//        const newFile = new File(
+//          [blob],
+//          file.name.replace(/\.[^/.]+$/, "") + ".jpg",
+//          { type: "image/jpeg" }
+//        );
+//
+//        resolve(newFile);
+//
+//      }, "image/jpeg", 0.8);
+//
+//    };
+//
+//    reader.readAsDataURL(file);
+//  });
+//}
 
 /* ===== ADMIN LOGIN ===== */
 window.checkAdmin = function () {
   const pass = document.getElementById("adminPass").value;
 
   if (pass === "admin") {
-    window.location.href = "admin.html";
+    window.location.href = "/admin";
   } else {
     alert("Kriva šifra");
   }
