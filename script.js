@@ -103,6 +103,7 @@ function loadFeed() {
     });
 
     createFeedObserver(feed);
+    hideLoader();
   });
 }
 
@@ -775,7 +776,16 @@ window.checkAdmin = function () {
     alert("Kriva šifra");
   }
 };
+function hideLoader() {
+  const loader = document.getElementById("loader");
+  if (!loader) return;
 
+  loader.classList.add("hide");
+
+  setTimeout(() => {
+    loader.remove();
+  }, 400);
+}
 /* ===== TOAST ===== */
 function showToast(message) {
   const toast = document.getElementById("toast");
@@ -801,4 +811,4 @@ document.addEventListener("touchend", function(e) {
 if (document.getElementById("feed")) {
   loadFeed();
   loadLiveCounters();
-}
+};

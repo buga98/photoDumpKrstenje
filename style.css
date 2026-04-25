@@ -758,3 +758,30 @@ img,
 body {
   touch-action: manipulation;
 }
+#loader{
+  position:fixed;
+  inset:0;
+  background:#ffffff;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  z-index:99999;
+  transition:opacity .35s ease;
+}
+
+#loader img{
+  width:160px;
+  max-width:60vw;
+  animation:pulse 1.4s infinite;
+}
+
+#loader.hide{
+  opacity:0;
+  pointer-events:none;
+}
+
+@keyframes pulse{
+  0%{transform:scale(1);opacity:.85;}
+  50%{transform:scale(1.05);opacity:1;}
+  100%{transform:scale(1);opacity:.85;}
+}
