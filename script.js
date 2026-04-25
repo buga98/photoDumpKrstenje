@@ -217,9 +217,10 @@ function createFeedCard(photoId, data) {
   img.src = data.thumbUrl || data.imageUrl;
   img.loading = "lazy";
   img.decoding = "async";
+
   img.onload = () => {
-  img.classList.add("loaded");
-};
+    img.classList.add("loaded");
+  };
 
   const likeBox = document.createElement("div");
   likeBox.className = "like-box";
@@ -241,6 +242,7 @@ function createFeedCard(photoId, data) {
     const userLikeRef = doc(db, "photos", photoId, "likes", userId);
 
     const checkSnap = await getDoc(userLikeRef);
+
     if (checkSnap.exists()) {
       likedCache.add(photoId);
       saveLikedCache();
@@ -266,37 +268,31 @@ function createFeedCard(photoId, data) {
     doLike();
   };
 
-let lastTap = 0;
-let tapTimer = null;
+  let lastTap = 0;
+  let tapTimer = null;
 
-img.addEventListener("touchend", (e) => {
-  e.preventDefault();
+  img.addEventListener("touchend", (e) => {
+    const now = Date.now();
+    const diff = now - lastTap;
 
-  const now = Date.now();
-  const diff = now - lastTap;
+    if (diff < 300 && diff > 0) {
+      clearTimeout(tapTimer);
+      doLike();
+      lastTap = 0;
+    } else {
+      lastTap = now;
 
-  if (diff < 300 && diff > 0) {
+      tapTimer = setTimeout(() => {
+        openFullscreen(data.imageUrl);
+      }, 310);
+    }
+  });
 
-    clearTimeout(tapTimer);
-    doLike();
-    lastTap = 0;
-
-  } else {
-
-    lastTap = now;
-
-    tapTimer = setTimeout(() => {
+  img.addEventListener("click", () => {
+    if (window.innerWidth > 900) {
       openFullscreen(data.imageUrl);
-    }, 310);
-  }
-
-}, { passive:false });
-
-img.addEventListener("click", (e) => {
-  if (window.innerWidth > 900) {
-    openFullscreen(data.imageUrl);
-  }
-});
+    }
+  });
 
   card.appendChild(img);
   card.appendChild(likeBox);
