@@ -288,11 +288,9 @@ function createFeedCard(photoId, data) {
     }
   });
 
-  img.addEventListener("click", () => {
-    if (window.innerWidth > 900) {
-      openFullscreen(data.imageUrl);
-    }
-  });
+img.addEventListener("click", () => {
+  openFullscreen(data.imageUrl);
+});
 
   card.appendChild(img);
   card.appendChild(likeBox);
@@ -409,6 +407,7 @@ function openFullscreen(url, startIndex = null) {
 
   full.appendChild(img);
   document.body.appendChild(full);
+  document.body.classList.add("fullscreen-open");
 
   let photos = [...renderedPhotos.keys()];
   let index = startIndex !== null ? startIndex : 0;
@@ -467,18 +466,22 @@ full.addEventListener("touchend", (e) => {
 
   // 👉 SWIPE GORE / DOLJE = close
   if (absY > absX && absY > 90) {
-    full.remove();
+    document.body.classList.remove("fullscreen-open");
+full.remove();
     return;
   }
 if (absX < 10 && absY < 10) {
-   full.remove();
+   document.body.classList.remove("fullscreen-open");
+full.remove();
    return;
 }
   // 👉 mali tap = ništa
 });
 
   full.onclick = (e) => {
-    if (e.target === full) full.remove();
+    if (e.target === full) 
+      document.body.classList.remove("fullscreen-open");
+full.remove();
   };
 
   render();
