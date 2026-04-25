@@ -420,18 +420,23 @@ function openFullscreen(url, startIndex = null) {
   if (!photos.length) {
     img.src = url;
   } else {
-    const currentId = [...renderedPhotos.entries()]
-      .find(([id, el]) => el.querySelector("img").src.includes(url));
+const currentId = [...renderedPhotos.entries()]
+  .find(([id, el]) => el.dataset.full === url);
 
     index = photos.indexOf(currentId?.[0]);
+
+if (index < 0) index = 0;
   }
 
-  function render() {
-    const id = photos[index];
-    const card = renderedPhotos.get(id);
-    const image = card.querySelector("img");
-    img.src = card.dataset.full || image.src;
-  }
+function render() {
+  const id = photos[index];
+  if (!id) return;
+
+  const card = renderedPhotos.get(id);
+  if (!card) return;
+
+  img.src = card.dataset.full;
+}
 
   let startX = 0;
   let startY = 0;
