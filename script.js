@@ -210,6 +210,9 @@ function createFeedCard(photoId, data) {
   img.src = data.thumbUrl || data.imageUrl;
   img.loading = "lazy";
   img.decoding = "async";
+  img.onload = () => {
+  img.classList.add("loaded");
+};
 
   const likeBox = document.createElement("div");
   likeBox.className = "like-box";
