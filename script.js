@@ -211,6 +211,7 @@ function createFeedCard(photoId, data) {
   const card = document.createElement("div");
   card.className = "feed-card";
   card.dataset.id = photoId;
+  card.dataset.full = data.imageUrl;
 
   const img = document.createElement("img");
   img.src = data.thumbUrl || data.imageUrl;
@@ -265,20 +266,37 @@ function createFeedCard(photoId, data) {
     doLike();
   };
 
-  let clickTimer = null;
+let lastTap = 0;
+let tapTimer = null;
 
-  img.onclick = () => {
-    if (clickTimer === null) {
-      clickTimer = setTimeout(() => {
-        openFullscreen(data.imageUrl);
-        clickTimer = null;
-      }, 220);
-    } else {
-      clearTimeout(clickTimer);
-      clickTimer = null;
-      doLike();
-    }
-  };
+img.addEventListener("touchend", (e) => {
+  e.preventDefault();
+
+  const now = Date.now();
+  const diff = now - lastTap;
+
+  if (diff < 300 && diff > 0) {
+
+    clearTimeout(tapTimer);
+    doLike();
+    lastTap = 0;
+
+  } else {
+
+    lastTap = now;
+
+    tapTimer = setTimeout(() => {
+      openFullscreen(data.imageUrl);
+    }, 310);
+  }
+
+}, { passive:false });
+
+img.addEventListener("click", (e) => {
+  if (window.innerWidth > 900) {
+    openFullscreen(data.imageUrl);
+  }
+});
 
   card.appendChild(img);
   card.appendChild(likeBox);
@@ -385,30 +403,84 @@ window.closeDelete = function () {
   document.getElementById("deleteModal").style.display = "none";
 };
 
-/* ===== FULLSCREEN ===== */
-function openFullscreen(url) {
-  const full = document.createElement("div");
+function openFullscreen(url, startIndex = null) {
 
-  full.style.cssText = `
-    position:fixed;
-    top:0;left:0;
-    width:100%;height:100%;
-    background:rgba(0,0,0,0.9);
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    z-index:999;
-  `;
+  const full = document.createElement("div");
+  full.className = "admin-fullscreen";
 
   const img = document.createElement("img");
-  img.src = url;
-  img.style.maxWidth = "90%";
-  img.style.maxHeight = "90%";
+  img.className = "admin-fullscreen-img";
 
   full.appendChild(img);
-  full.onclick = () => full.remove();
-
   document.body.appendChild(full);
+
+  let photos = [...renderedPhotos.keys()];
+  let index = startIndex !== null ? startIndex : 0;
+
+  if (!photos.length) {
+    img.src = url;
+  } else {
+    const currentId = [...renderedPhotos.entries()]
+      .find(([id, el]) => el.querySelector("img").src.includes(url));
+
+    index = photos.indexOf(currentId?.[0]);
+  }
+
+  function render() {
+    const id = photos[index];
+    const card = renderedPhotos.get(id);
+    const image = card.querySelector("img");
+    img.src = card.dataset.full || image.src;
+  }
+
+  let startX = 0;
+  let startY = 0;
+
+  full.addEventListener("touchstart", (e) => {
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+  }, { passive:true });
+
+full.addEventListener("touchend", (e) => {
+  const endX = e.changedTouches[0].clientX;
+  const endY = e.changedTouches[0].clientY;
+
+  const diffX = startX - endX;
+  const diffY = startY - endY;
+
+  const absX = Math.abs(diffX);
+  const absY = Math.abs(diffY);
+
+  // 👉 SWIPE LIJEVO / DESNO
+  if (absX > absY && absX > 50) {
+
+    if (diffX > 0) {
+      index = (index + 1) % photos.length;
+    } else {
+      index = (index - 1 + photos.length) % photos.length;
+    }
+
+    render();
+    return;
+  }
+
+  // 👉 SWIPE GORE / DOLJE = close
+  if (absY > absX && absY > 90) {
+    full.remove();
+    return;
+  }
+if (absX < 10 && absY < 10) {
+   full.remove();
+   return;
+}
+  // 👉 mali tap = ništa
+});
+
+  full.onclick = (e) => {
+    if (e.target === full) full.remove();
+  };
+
+  render();
 }
 
 /* ===== PUBLIC GALLERY ===== */
@@ -743,55 +815,6 @@ function loadLiveCounters() {
   });
 }
 
-//async function compressImage(file) {
-//
-//  return new Promise((resolve) => {
-//
-//    const reader = new FileReader();
-//    const img = new Image();
-//
-//    reader.onload = (e) => {
-//      img.src = e.target.result;
-//    };
-//
-//    img.onload = () => {
-//
-//      let width = img.width;
-//      let height = img.height;
-//
-//      const maxWidth = 1600;
-//
-//      if (width > maxWidth) {
-//        height = height * (maxWidth / width);
-//        width = maxWidth;
-//      }
-//
-//      const canvas = document.createElement("canvas");
-//      const ctx = canvas.getContext("2d");
-//
-//      canvas.width = width;
-//      canvas.height = height;
-//
-//      ctx.drawImage(img, 0, 0, width, height);
-//
-//      canvas.toBlob((blob) => {
-//
-//        const newFile = new File(
-//          [blob],
-//          file.name.replace(/\.[^/.]+$/, "") + ".jpg",
-//          { type: "image/jpeg" }
-//        );
-//
-//        resolve(newFile);
-//
-//      }, "image/jpeg", 0.8);
-//
-//    };
-//
-//    reader.readAsDataURL(file);
-//  });
-//}
-
 /* ===== ADMIN LOGIN ===== */
 window.checkAdmin = function () {
   const pass = document.getElementById("adminPass").value;
@@ -811,19 +834,7 @@ function showToast(message) {
 
   setTimeout(() => toast.classList.remove("show"), 2000);
 }
-let lastTap = 0;
 
-document.addEventListener("touchend", function(e) {
-
-  const now = Date.now();
-
-  if (now - lastTap < 350) {
-    e.preventDefault();
-  }
-
-  lastTap = now;
-
-}, { passive: false });
 /* ===== AUTO LOAD ===== */
 if (document.getElementById("feed")) {
   loadFeed();
