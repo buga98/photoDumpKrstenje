@@ -197,6 +197,9 @@ function createFeedCard(photoId, data) {
   img.src = data.thumbUrl || data.imageUrl;
   img.loading = "lazy";
   img.decoding = "async";
+  img.style.userSelect = "none";
+img.style.webkitUserSelect = "none";
+img.draggable = false;
 
   img.onload = () => {
     img.classList.add("loaded");
@@ -254,12 +257,34 @@ let lastTap = 0;
 let tapTimer = null;
 let isDoubleTap = false;
 
+let startX = 0;
+let startY = 0;
+let moved = false;
+
+img.addEventListener("touchstart", (e) => {
+  const t = e.touches[0];
+  startX = t.clientX;
+  startY = t.clientY;
+  moved = false;
+});
+
+img.addEventListener("touchmove", (e) => {
+  const t = e.touches[0];
+  const dx = Math.abs(t.clientX - startX);
+  const dy = Math.abs(t.clientY - startY);
+
+  if (dx > 15 || dy > 15) {
+    moved = true;
+  }
+}, { passive: true });
+
 img.addEventListener("touchend", (e) => {
+  if (moved) return; // 🔥 NAJVAŽNIJE — blokira fullscreen na scrollu
+
   const now = Date.now();
   const diff = now - lastTap;
 
   if (diff < 300 && diff > 0) {
-    // DOUBLE TAP
     isDoubleTap = true;
 
     clearTimeout(tapTimer);
@@ -271,7 +296,6 @@ img.addEventListener("touchend", (e) => {
     return;
   }
 
-  // SINGLE TAP (čekamo malo)
   isDoubleTap = false;
   lastTap = now;
 
@@ -401,6 +425,7 @@ window.closeDelete = function () {
 };
 
 function openFullscreen(url, startIndex = null) {
+    if (document.querySelector(".admin-fullscreen")) return;
 
   const full = document.createElement("div");
   full.className = "admin-fullscreen";
