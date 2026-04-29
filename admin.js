@@ -5,24 +5,26 @@ import {
   getDocs,
   query,
   orderBy,
-  onSnapshot,
   updateDoc,
-  doc
+  doc,
+  limit
 } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
 
+/* ================= FIREBASE ================= */
 const firebaseConfig = {
-  apiKey: "AIzaSyA3qAy-Ij6yPvOcfEvzguTak4CJCc1a5UU",
+  apiKey: "AIzaSy...",
   authDomain: "photodumpkrstenje.firebaseapp.com",
   projectId: "photodumpkrstenje",
-  storageBucket: "photodumpkrstenje.firebasestorage.app",
-  messagingSenderId: "552390088463",
-  appId: "1:552390088463:web:ac5fd3c62359149eb9d07a"
 };
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-/* ===================== STATE ===================== */
+/* ================= SETTINGS ================= */
+const IMAGE_LIMIT = 80;
+const DEDICATION_LIMIT = 80;
+
+/* ================= STATE ================= */
 let currentFilter = "all";
 
 let selectedPhotoId = null;
@@ -30,19 +32,15 @@ let selectedWrapper = null;
 let selectedVisible = true;
 
 let allImages = [];
-let allDedications = [];
-
-let galleryUnsubscribe = null;
-let dedicationsUnsubscribe = null;
-
 let slideshowImages = [];
+
 let slideshowInterval = null;
 let overlay = null;
 
 let showAuthor = true;
 let showDedications = false;
 
-/* ===================== HELPERS ===================== */
+/* ================= HELPERS ================= */
 function buildImageList(snapshot) {
   allImages = [];
 
@@ -58,16 +56,7 @@ function buildImageList(snapshot) {
   });
 }
 
-async function loadAllDedications() {
-  const snapshot = await getDocs(collection(db, "dedications"));
-  allDedications = [];
-
-  snapshot.forEach((docSnap) => {
-    allDedications.push(docSnap.data());
-  });
-}
-
-/* ===================== FILTER ===================== */
+/* ================= FILTER ================= */
 window.filterPhotos = function (type) {
   currentFilter = type;
 
@@ -75,110 +64,92 @@ window.filterPhotos = function (type) {
     btn.classList.remove("active");
   });
 
-  const map = {
-    all: 0,
-    visible: 1,
-    hidden: 2
-  };
-
+  const map = { all: 0, visible: 1, hidden: 2 };
   const buttons = document.querySelectorAll(".admin-filters button");
-  if (buttons[map[type]]) {
-    buttons[map[type]].classList.add("active");
-  }
+  buttons[map[type]]?.classList.add("active");
 
   loadAllImages();
 };
 
-/* ===================== GALLERY ===================== */
-function loadAllImages() {
+/* ================= GALLERY ================= */
+async function loadAllImages() {
   const gallery = document.getElementById("gallery");
   if (!gallery) return;
 
-  if (galleryUnsubscribe) {
-    galleryUnsubscribe();
-  }
+  gallery.innerHTML = "Učitavanje...";
 
-  galleryUnsubscribe = onSnapshot(
-    query(collection(db, "photos"), orderBy("created", "desc")),
-    (snapshot) => {
-      gallery.innerHTML = "";
-      buildImageList(snapshot);
-
-      let count = 0;
-
-      snapshot.forEach((docSnap) => {
-        const data = docSnap.data();
-
-        if (currentFilter === "visible" && data.visible === false) return;
-        if (currentFilter === "hidden" && data.visible !== false) return;
-
-        count++;
-
-        const wrapper = document.createElement("div");
-        wrapper.className = "photo-card";
-        wrapper.style.position = "relative";
-
-        if (data.visible === false) {
-          wrapper.classList.add("hidden-photo");
-        }
-
-        const img = document.createElement("img");
-        img.src = data.imageUrl;
-        img.alt = "Fotografija";
-
-        wrapper.appendChild(img);
-
-        const badge = document.createElement("div");
-        badge.className = "admin-badge";
-        badge.innerText = data.visible === false ? "🚫" : "✔";
-        wrapper.appendChild(badge);
-
-        let pressTimer = null;
-        let isLongPress = false;
-
-        const startPress = () => {
-          isLongPress = false;
-
-          pressTimer = setTimeout(() => {
-            isLongPress = true;
-            openPhotoAction(docSnap.id, wrapper);
-          }, 600);
-        };
-
-        const endPress = () => {
-          clearTimeout(pressTimer);
-
-          if (!isLongPress) {
-            openFullscreenFromList(docSnap.id);
-          }
-        };
-
-        const cancelPress = () => {
-          clearTimeout(pressTimer);
-        };
-
-        wrapper.addEventListener("touchstart", startPress, { passive: true });
-        wrapper.addEventListener("touchend", endPress);
-        wrapper.addEventListener("touchmove", cancelPress);
-
-        wrapper.addEventListener("mousedown", startPress);
-        wrapper.addEventListener("mouseup", endPress);
-        wrapper.addEventListener("mouseleave", cancelPress);
-
-        gallery.appendChild(wrapper);
-      });
-
-      const photoCount = document.getElementById("photoCount");
-      if (photoCount) {
-        photoCount.innerText = count;
-      }
-    }
+  const snapshot = await getDocs(
+    query(
+      collection(db, "photos"),
+      orderBy("created", "desc"),
+      limit(IMAGE_LIMIT)
+    )
   );
+
+  gallery.innerHTML = "";
+  buildImageList(snapshot);
+
+  let count = 0;
+
+  snapshot.forEach((docSnap) => {
+    const data = docSnap.data();
+
+    if (currentFilter === "visible" && data.visible === false) return;
+    if (currentFilter === "hidden" && data.visible !== false) return;
+
+    count++;
+
+    const wrapper = document.createElement("div");
+    wrapper.className = "photo-card";
+
+    if (data.visible === false) {
+      wrapper.classList.add("hidden-photo");
+    }
+
+    const img = document.createElement("img");
+    img.src = data.thumbUrl || data.imageUrl; // 🔥 OPTIMIZACIJA
+
+    wrapper.appendChild(img);
+
+    const badge = document.createElement("div");
+    badge.className = "admin-badge";
+    badge.innerText = data.visible === false ? "🚫" : "✔";
+    wrapper.appendChild(badge);
+
+    /* LONG PRESS */
+    let pressTimer;
+    let isLongPress = false;
+
+    const start = () => {
+      isLongPress = false;
+      pressTimer = setTimeout(() => {
+        isLongPress = true;
+        openPhotoAction(docSnap.id, wrapper);
+      }, 600);
+    };
+
+    const end = () => {
+      clearTimeout(pressTimer);
+      if (!isLongPress) {
+        openFullscreenFromList(docSnap.id);
+      }
+    };
+
+    wrapper.addEventListener("touchstart", start);
+    wrapper.addEventListener("touchend", end);
+    wrapper.addEventListener("mousedown", start);
+    wrapper.addEventListener("mouseup", end);
+    wrapper.addEventListener("mouseleave", () => clearTimeout(pressTimer));
+
+    gallery.appendChild(wrapper);
+  });
+
+  document.getElementById("photoCount").innerText = count;
 }
 
-/* ===================== FULLSCREEN SWIPE ===================== */
+/* ================= FULLSCREEN ================= */
 function openFullscreenFromList(photoId) {
-  let index = allImages.findIndex((p) => p.id === photoId);
+  let index = allImages.findIndex(p => p.id === photoId);
   if (index === -1) return;
 
   const full = document.createElement("div");
@@ -191,117 +162,81 @@ function openFullscreenFromList(photoId) {
   actions.className = "admin-fullscreen-actions";
 
   const hideBtn = document.createElement("button");
-  hideBtn.className = "btn-secondary";
   hideBtn.innerText = "Sakrij";
 
   const showBtn = document.createElement("button");
-  showBtn.className = "btn-primary";
   showBtn.innerText = "Vrati";
 
   const closeBtn = document.createElement("button");
-  closeBtn.className = "btn-secondary";
   closeBtn.innerText = "Zatvori";
 
-  actions.appendChild(hideBtn);
-  actions.appendChild(showBtn);
-  actions.appendChild(closeBtn);
-
-  full.appendChild(img);
-  full.appendChild(actions);
+  actions.append(hideBtn, showBtn, closeBtn);
+  full.append(img, actions);
   document.body.appendChild(full);
 
   function render() {
     const current = allImages[index];
-    if (!current) return;
-
     img.src = current.url;
 
-    hideBtn.style.display = current.visible ? "inline-flex" : "none";
-    showBtn.style.display = current.visible ? "none" : "inline-flex";
-
-    if (current.visible) {
-      img.style.filter = "none";
-      img.style.opacity = "1";
-    } else {
-      img.style.filter = "grayscale(100%)";
-      img.style.opacity = "0.7";
-    }
+    hideBtn.style.display = current.visible ? "block" : "none";
+    showBtn.style.display = current.visible ? "none" : "block";
   }
 
-  hideBtn.onclick = async (e) => {
-    e.stopPropagation();
-
+  hideBtn.onclick = async () => {
     const current = allImages[index];
     await updateDoc(doc(db, "photos", current.id), { visible: false });
     current.visible = false;
     render();
   };
 
-  showBtn.onclick = async (e) => {
-    e.stopPropagation();
-
+  showBtn.onclick = async () => {
     const current = allImages[index];
     await updateDoc(doc(db, "photos", current.id), { visible: true });
     current.visible = true;
     render();
   };
 
-  closeBtn.onclick = (e) => {
-    e.stopPropagation();
-    full.remove();
-  };
+  closeBtn.onclick = () => full.remove();
 
   let startX = 0;
-  let startY = 0;
 
-  full.addEventListener("touchstart", (e) => {
+  full.addEventListener("touchstart", e => {
     startX = e.touches[0].clientX;
-    startY = e.touches[0].clientY;
-  }, { passive: true });
+  });
 
-  full.addEventListener("touchend", (e) => {
-    const endX = e.changedTouches[0].clientX;
-    const endY = e.changedTouches[0].clientY;
+  full.addEventListener("touchend", e => {
+    const diff = startX - e.changedTouches[0].clientX;
 
-    const diffX = startX - endX;
-    const diffY = startY - endY;
+    if (Math.abs(diff) > 50) {
+      index = diff > 0
+        ? (index + 1) % allImages.length
+        : (index - 1 + allImages.length) % allImages.length;
 
-    if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 50) {
-      if (diffX > 0) {
-        index = (index + 1) % allImages.length;
-      } else {
-        index = (index - 1 + allImages.length) % allImages.length;
-      }
       render();
     }
   });
 
-  full.addEventListener("click", (e) => {
-    if (e.target === full) {
-      full.remove();
-    }
-  });
+  full.onclick = e => {
+    if (e.target === full) full.remove();
+  };
 
   render();
 }
 
-/* ===================== PHOTO ACTION MODAL ===================== */
+/* ================= ACTION MODAL ================= */
 function openPhotoAction(id, wrapper) {
   selectedPhotoId = id;
   selectedWrapper = wrapper;
   selectedVisible = !wrapper.classList.contains("hidden-photo");
 
-  const title = selectedVisible
-    ? "Maknuti sliku iz prikaza?"
-    : "Vratiti sliku u prikaz?";
+  document.getElementById("photoActionTitle").innerText =
+    selectedVisible ? "Maknuti sliku?" : "Vratiti sliku?";
 
-  document.getElementById("photoActionTitle").innerText = title;
   document.getElementById("photoActionModal").style.display = "flex";
 }
 
 window.confirmPhotoAction = async function (confirm) {
   document.getElementById("photoActionModal").style.display = "none";
-
   if (!confirm) return;
 
   const newState = !selectedVisible;
@@ -310,57 +245,46 @@ window.confirmPhotoAction = async function (confirm) {
     visible: newState
   });
 
-  if (!newState) {
-    selectedWrapper?.classList.add("hidden-photo");
-  } else {
-    selectedWrapper?.classList.remove("hidden-photo");
-  }
+  selectedWrapper.classList.toggle("hidden-photo", !newState);
 };
 
-/* ===================== DEDICATIONS ===================== */
-function loadDedications() {
+/* ================= DEDICATIONS ================= */
+async function loadDedications() {
   const list = document.getElementById("dedicationsList");
   if (!list) return;
 
-  if (dedicationsUnsubscribe) {
-    dedicationsUnsubscribe();
-  }
-
-  dedicationsUnsubscribe = onSnapshot(
-    query(collection(db, "dedications"), orderBy("created", "desc")),
-    (snapshot) => {
-      list.innerHTML = "";
-
-      snapshot.forEach((docSnap) => {
-        const data = docSnap.data();
-        const text = data.text || "";
-
-        const preview = text.length > 50
-          ? text.substring(0, 50) + "..."
-          : text;
-
-        const item = document.createElement("div");
-        item.className = "dedication-card";
-        item.innerHTML = `
-          <div class="dedication-preview">${preview}</div>
-          <div class="dedication-author">${data.name || "Gost"}</div>
-        `;
-
-        item.onclick = () => openDedicationModal(data);
-        list.appendChild(item);
-      });
-
-      const dedicationCount = document.getElementById("dedicationCount");
-      if (dedicationCount) {
-        dedicationCount.innerText = snapshot.size;
-      }
-    }
+  const snapshot = await getDocs(
+    query(
+      collection(db, "dedications"),
+      orderBy("created", "desc"),
+      limit(DEDICATION_LIMIT)
+    )
   );
+
+  list.innerHTML = "";
+
+  snapshot.forEach(docSnap => {
+    const data = docSnap.data();
+
+    const item = document.createElement("div");
+    item.className = "dedication-card";
+
+    item.innerHTML = `
+      <div>${(data.text || "").slice(0, 50)}...</div>
+      <small>${data.name || "Gost"}</small>
+    `;
+
+    item.onclick = () => openDedicationModal(data);
+
+    list.appendChild(item);
+  });
+
+  document.getElementById("dedicationCount").innerText = snapshot.size;
 }
 
 window.openDedicationModal = function (data) {
-  document.getElementById("dedicationFullText").innerText = data.text || "";
-  document.getElementById("dedicationAuthor").innerText = "— " + (data.name || "Gost");
+  document.getElementById("dedicationFullText").innerText = data.text;
+  document.getElementById("dedicationAuthor").innerText = "— " + data.name;
   document.getElementById("dedicationModal").style.display = "flex";
 };
 
@@ -368,180 +292,98 @@ window.closeDedicationModal = function () {
   document.getElementById("dedicationModal").style.display = "none";
 };
 
-/* ===================== SETTINGS ===================== */
-window.openSettings = function () {
-  const modal = document.getElementById("settingsModal");
-  if (!modal) return;
-  modal.style.display = "flex";
-};
+/* ================= SETTINGS ================= */
+window.openSettings = () =>
+  document.getElementById("settingsModal").style.display = "flex";
 
 window.closeSettings = function () {
-  const authorCheckbox = document.getElementById("showAuthor");
-  const dedicationCheckbox = document.getElementById("showDedications");
-
-  showAuthor = !!authorCheckbox?.checked;
-  showDedications = !!dedicationCheckbox?.checked;
-
-  const modal = document.getElementById("settingsModal");
-  if (modal) {
-    modal.style.display = "none";
-  }
+  showAuthor = document.getElementById("showAuthor").checked;
+  showDedications = document.getElementById("showDedications").checked;
+  document.getElementById("settingsModal").style.display = "none";
 };
 
-/* ===================== DOWNLOAD ===================== */
-window.downloadAllPhotos = async function () {
-  const zip = new JSZip();
-  const snapshot = await getDocs(collection(db, "photos"));
-
-  let count = 1;
-
-  for (const docSnap of snapshot.docs) {
-    const data = docSnap.data();
-    if (!data.imageUrl) continue;
-
-    const response = await fetch(data.imageUrl);
-    const blob = await response.blob();
-
-    zip.file(`photo_${count}.jpg`, blob);
-    count++;
-  }
-
-  const content = await zip.generateAsync({ type: "blob" });
-  const link = document.createElement("a");
-  link.href = URL.createObjectURL(content);
-  link.download = "fotografije.zip";
-  link.click();
+/* ================= DOWNLOAD DISABLED ================= */
+window.downloadAllPhotos = function () {
+  alert("Download trenutno nije dostupan 🙂");
 };
 
-/* ===================== SLIDESHOW ===================== */
+/* ================= SLIDESHOW ================= */
 window.startSlideshow = async function () {
   if (overlay) return;
 
-  await loadAllDedications();
-
   const snapshot = await getDocs(
-    query(collection(db, "photos"), orderBy("created", "desc"))
+    query(
+      collection(db, "photos"),
+      orderBy("created", "desc"),
+      limit(IMAGE_LIMIT)
+    )
   );
 
   slideshowImages = [];
 
-  snapshot.forEach((docSnap) => {
+  snapshot.forEach(docSnap => {
     const data = docSnap.data();
-
     if (data.visible === false) return;
-    if (!data.imageUrl) return;
 
     slideshowImages.push({
-      id: docSnap.id,
       url: data.imageUrl,
       user: data.user || "Gost"
     });
   });
 
-  if (slideshowImages.length === 0) {
-    alert("Nema vidljivih slika za slideshow.");
+  if (!slideshowImages.length) {
+    alert("Nema slika");
     return;
   }
 
-  showSlideshow();
-};
-
-function showSlideshow() {
   overlay = document.createElement("div");
   overlay.id = "slideshowOverlay";
 
   const img = document.createElement("img");
-  img.className = "slideshow-img";
-
-  const info = document.createElement("div");
-  info.className = "slideshow-info info-bottom";
-
   overlay.appendChild(img);
-  overlay.appendChild(info);
   document.body.appendChild(overlay);
 
-  function nextSlide() {
-    if (slideshowImages.length === 0) return;
+  function next() {
+    const i = Math.floor(Math.random() * slideshowImages.length);
+    const current = slideshowImages[i];
 
-    const randomIndex = Math.floor(Math.random() * slideshowImages.length);
-    const current = slideshowImages[randomIndex];
-
-    img.style.opacity = "0";
-    info.style.opacity = "0";
-
-    setTimeout(() => {
-      img.src = current.url;
-
-      info.innerHTML = showAuthor
-        ? `<div class="slideshow-user">${current.user}</div>`
-        : "";
-
-      img.style.opacity = "1";
-      info.style.opacity = "1";
-    }, 250);
+    img.src = current.url;
   }
 
-  nextSlide();
+  next();
 
   const speed = Number(document.getElementById("slideSpeed")?.value || 3000);
-  slideshowInterval = setInterval(nextSlide, speed);
+  slideshowInterval = setInterval(next, speed);
 
-  overlay.onclick = (e) => {
-    if (e.target === overlay) {
-      clearInterval(slideshowInterval);
-      slideshowInterval = null;
-      overlay.remove();
-      overlay = null;
-    }
+  overlay.onclick = () => {
+    clearInterval(slideshowInterval);
+    overlay.remove();
+    overlay = null;
   };
-}
+};
 
-/* ===================== BOTTOM NAV ===================== */
+/* ================= NAV ================= */
 window.switchAdminScreen = function (screen) {
-  document.querySelectorAll(".tab-content").forEach((el) => {
-    el.classList.remove("active");
-  });
+  document.querySelectorAll(".tab-content").forEach(el =>
+    el.classList.remove("active")
+  );
 
-  document.querySelectorAll(".admin-nav-item").forEach((el) => {
-    el.classList.remove("active");
-  });
-
-  const photos = document.getElementById("adminPhotos");
-  const dedications = document.getElementById("adminDedications");
-  const items = document.querySelectorAll(".admin-nav-item");
+  document.querySelectorAll(".admin-nav-item").forEach(el =>
+    el.classList.remove("active")
+  );
 
   if (screen === "photos") {
-    photos?.classList.add("active");
-    items[0]?.classList.add("active");
+    document.getElementById("adminPhotos").classList.add("active");
+    document.querySelectorAll(".admin-nav-item")[0].classList.add("active");
   }
 
   if (screen === "dedications") {
-    dedications?.classList.add("active");
-    items[1]?.classList.add("active");
+    document.getElementById("adminDedications").classList.add("active");
+    document.querySelectorAll(".admin-nav-item")[1].classList.add("active");
   }
 };
 
-/* ===================== CLOSE MODALS ON BACKDROP ===================== */
-window.addEventListener("click", (e) => {
-  const settingsModal = document.getElementById("settingsModal");
-  const dedicationModal = document.getElementById("dedicationModal");
-  const photoActionModal = document.getElementById("photoActionModal");
-
-  if (e.target === settingsModal) {
-    settingsModal.style.display = "none";
-  }
-
-  if (e.target === dedicationModal) {
-    dedicationModal.style.display = "none";
-  }
-
-  if (e.target === photoActionModal) {
-    photoActionModal.style.display = "none";
-  }
-});
-
-/* ===================== INIT ===================== */
+/* ================= INIT ================= */
 loadAllImages();
 loadDedications();
-window.filterPhotos("all");
-window.switchAdminScreen("photos");
+switchAdminScreen("photos");
