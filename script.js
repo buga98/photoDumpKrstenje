@@ -47,7 +47,7 @@ window.enterApp = function () {
 
 /* ===== LIVE FEED ===== */
 
-const FEED_PAGE_SIZE = 24;
+const FEED_PAGE_SIZE = 18;
 const likedCache = new Set(JSON.parse(localStorage.getItem("likedPhotos") || "[]"));
 
 let feedStarted = false;
@@ -283,10 +283,14 @@ img.addEventListener("touchend", (e) => {
     }
   }, 300);
 });
-
 img.addEventListener("click", () => {
-  openFullscreen(data.imageUrl);
+  if (!("ontouchstart" in window)) {
+    openFullscreen(data.imageUrl);
+  }
 });
+//img.addEventListener("click", () => {
+//  openFullscreen(data.imageUrl);
+//});
 
   card.appendChild(img);
   card.appendChild(likeBox);
@@ -504,33 +508,6 @@ function openFullscreen(url, startIndex = null) {
   render();
 }
 
-/* ===== PUBLIC GALLERY ===== */
-window.openGallery = async function () {
-  document.getElementById("galleryModal").style.display = "flex";
-
-  const gallery = document.getElementById("publicGallery");
-  gallery.innerHTML = "Učitavanje...";
-
-  const snapshot = await getDocs(collection(db, "photos"));
-  gallery.innerHTML = "";
-
-  snapshot.forEach(doc => {
-    const data = doc.data();
-
-    if (data.visible === false) return;
-    if (data.type === "video") return;
-
-    const img = document.createElement("img");
-    img.src = data.thumbUrl || data.imageUrl;
-    img.onclick = () => openFullscreen(data.imageUrl);
-
-    gallery.appendChild(img);
-  });
-};
-
-window.closeGallery = function () {
-  document.getElementById("galleryModal").style.display = "none";
-};
 
 /* ===== NAVIGATION ===== */
 window.switchScreen = function (screen) {
