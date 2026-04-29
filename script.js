@@ -36,7 +36,7 @@ window.enterApp = function () {
 
   createUser(userId, name);
 
-  window.location.href = "/app";
+  window.location.href = "/app.html";
 };
 
 /* ===== LIVE FEED ===== */
