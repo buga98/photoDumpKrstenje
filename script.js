@@ -633,7 +633,7 @@ await updateDoc(doc(db, "stats", "main"), {
   dedications: increment(1)
 });
   document.getElementById("dedicationText").value = "";
-  showSuccessModal();
+  showToast("🤍 Hvala na lijepim riječima");
 };
 
 window.showSuccessModal = function () {
