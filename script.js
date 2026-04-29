@@ -252,27 +252,36 @@ function createFeedCard(photoId, data) {
   };
 let lastTap = 0;
 let tapTimer = null;
+let isDoubleTap = false;
 
-img.addEventListener("touchend", () => {
+img.addEventListener("touchend", (e) => {
   const now = Date.now();
   const diff = now - lastTap;
 
   if (diff < 300 && diff > 0) {
-    clearTimeout(tapTimer);   // gasi fullscreen
+    // DOUBLE TAP
+    isDoubleTap = true;
+
+    clearTimeout(tapTimer);
     tapTimer = null;
 
     doLike();
     lastTap = 0;
+
     return;
   }
 
+  // SINGLE TAP (čekamo malo)
+  isDoubleTap = false;
   lastTap = now;
 
   clearTimeout(tapTimer);
 
   tapTimer = setTimeout(() => {
-    openFullscreen(data.imageUrl);
-  }, 320);
+    if (!isDoubleTap) {
+      openFullscreen(data.imageUrl);
+    }
+  }, 300);
 });
 
 img.addEventListener("click", () => {
@@ -552,8 +561,8 @@ window.uploadToFirebase = function (file, user, onProgress) {
 
     try {
 
-      const bigFile = await resizeImage(file, 1600, 0.8);
-      const thumbFile = await resizeImage(file, 450, 0.65);
+      const bigFile = await resizeImage(file, 1450, 0.8);
+      const thumbFile = await resizeImage(file, 350, 0.65);
 
       // BIG
       const bigRef = ref(storage, 'photos/' + Date.now() + '_' + file.name);
@@ -711,12 +720,12 @@ window.loadMyImages = async function () {
         clearTimeout(pressTimer);
       });
 
-      /* ===== CLICK ===== */
-      img.addEventListener("click", () => {
-        if (!isLongPress) {
-          openFullscreen(data.imageUrl);
-        }
-      });
+//    /* ===== CLICK ===== */
+//    img.addEventListener("click", () => {
+//      if (!isLongPress) {
+//        openFullscreen(data.imageUrl);
+//      }
+//    });
 
       /* ===== CANCEL ===== */
       img.addEventListener("touchmove", () => clearTimeout(pressTimer));
