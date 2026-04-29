@@ -21,8 +21,8 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
 /* ================= SETTINGS ================= */
-const IMAGE_LIMIT = 80;
-const DEDICATION_LIMIT = 80;
+const IMAGE_LIMIT = 50;
+const DEDICATION_LIMIT = 50;
 
 /* ================= STATE ================= */
 let currentFilter = "all";
@@ -37,8 +37,8 @@ let slideshowImages = [];
 let slideshowInterval = null;
 let overlay = null;
 
-let showAuthor = true;
-let showDedications = false;
+let showAuthor = localStorage.getItem("showAuthor") !== "false";
+let showDedications = localStorage.getItem("showDedications") === "true";
 
 /* ================= HELPERS ================= */
 function buildImageList(snapshot) {
@@ -46,6 +46,9 @@ function buildImageList(snapshot) {
 
   snapshot.forEach((docSnap) => {
     const data = docSnap.data();
+
+    if (currentFilter === "visible" && data.visible === false) return;
+    if (currentFilter === "hidden" && data.visible !== false) return;
 
     allImages.push({
       id: docSnap.id,
@@ -65,8 +68,7 @@ window.filterPhotos = function (type) {
   });
 
   const map = { all: 0, visible: 1, hidden: 2 };
-  const buttons = document.querySelectorAll(".admin-filters button");
-  buttons[map[type]]?.classList.add("active");
+  document.querySelectorAll(".admin-filters button")[map[type]]?.classList.add("active");
 
   loadAllImages();
 };
@@ -79,11 +81,7 @@ async function loadAllImages() {
   gallery.innerHTML = "Učitavanje...";
 
   const snapshot = await getDocs(
-    query(
-      collection(db, "photos"),
-      orderBy("created", "desc"),
-      limit(IMAGE_LIMIT)
-    )
+    query(collection(db, "photos"), orderBy("created", "desc"), limit(IMAGE_LIMIT))
   );
 
   gallery.innerHTML = "";
@@ -91,29 +89,25 @@ async function loadAllImages() {
 
   let count = 0;
 
-  snapshot.forEach((docSnap) => {
-    const data = docSnap.data();
-
-    if (currentFilter === "visible" && data.visible === false) return;
-    if (currentFilter === "hidden" && data.visible !== false) return;
-
+  allImages.forEach((imgData) => {
     count++;
 
     const wrapper = document.createElement("div");
     wrapper.className = "photo-card";
 
-    if (data.visible === false) {
-      wrapper.classList.add("hidden-photo");
-    }
+    if (!imgData.visible) wrapper.classList.add("hidden-photo");
 
     const img = document.createElement("img");
-    img.src = data.thumbUrl || data.imageUrl; // 🔥 OPTIMIZACIJA
+    img.src = imgData.url;
+    img.loading = "lazy";
+    img.decoding = "async";
+    img.style.touchAction = "manipulation";
 
     wrapper.appendChild(img);
 
     const badge = document.createElement("div");
     badge.className = "admin-badge";
-    badge.innerText = data.visible === false ? "🚫" : "✔";
+    badge.innerText = imgData.visible ? "✔" : "🚫";
     wrapper.appendChild(badge);
 
     /* LONG PRESS */
@@ -124,22 +118,18 @@ async function loadAllImages() {
       isLongPress = false;
       pressTimer = setTimeout(() => {
         isLongPress = true;
-        openPhotoAction(docSnap.id, wrapper);
+        openPhotoAction(imgData.id, wrapper);
       }, 600);
     };
 
     const end = () => {
       clearTimeout(pressTimer);
-      if (!isLongPress) {
-        openFullscreenFromList(docSnap.id);
-      }
+      if (!isLongPress) openFullscreenFromList(imgData.id);
     };
 
     wrapper.addEventListener("touchstart", start);
     wrapper.addEventListener("touchend", end);
-    wrapper.addEventListener("mousedown", start);
-    wrapper.addEventListener("mouseup", end);
-    wrapper.addEventListener("mouseleave", () => clearTimeout(pressTimer));
+    wrapper.addEventListener("touchcancel", () => clearTimeout(pressTimer));
 
     gallery.appendChild(wrapper);
   });
@@ -158,50 +148,23 @@ function openFullscreenFromList(photoId) {
   const img = document.createElement("img");
   img.className = "admin-fullscreen-img";
 
-  const actions = document.createElement("div");
-  actions.className = "admin-fullscreen-actions";
-
-  const hideBtn = document.createElement("button");
-  hideBtn.innerText = "Sakrij";
-
-  const showBtn = document.createElement("button");
-  showBtn.innerText = "Vrati";
-
-  const closeBtn = document.createElement("button");
-  closeBtn.innerText = "Zatvori";
-
-  actions.append(hideBtn, showBtn, closeBtn);
-  full.append(img, actions);
+  full.appendChild(img);
   document.body.appendChild(full);
 
   function render() {
-    const current = allImages[index];
-    img.src = current.url;
-
-    hideBtn.style.display = current.visible ? "block" : "none";
-    showBtn.style.display = current.visible ? "none" : "block";
+    img.src = allImages[index].url;
   }
 
-  hideBtn.onclick = async () => {
-    const current = allImages[index];
-    await updateDoc(doc(db, "photos", current.id), { visible: false });
-    current.visible = false;
-    render();
-  };
-
-  showBtn.onclick = async () => {
-    const current = allImages[index];
-    await updateDoc(doc(db, "photos", current.id), { visible: true });
-    current.visible = true;
-    render();
-  };
-
-  closeBtn.onclick = () => full.remove();
-
   let startX = 0;
+  let isSwiping = false;
 
   full.addEventListener("touchstart", e => {
     startX = e.touches[0].clientX;
+    isSwiping = false;
+  });
+
+  full.addEventListener("touchmove", () => {
+    isSwiping = true;
   });
 
   full.addEventListener("touchend", e => {
@@ -213,12 +176,10 @@ function openFullscreenFromList(photoId) {
         : (index - 1 + allImages.length) % allImages.length;
 
       render();
+    } else if (!isSwiping) {
+      full.remove();
     }
   });
-
-  full.onclick = e => {
-    if (e.target === full) full.remove();
-  };
 
   render();
 }
@@ -246,6 +207,12 @@ window.confirmPhotoAction = async function (confirm) {
   });
 
   selectedWrapper.classList.toggle("hidden-photo", !newState);
+
+  const badge = selectedWrapper.querySelector(".admin-badge");
+  if (badge) badge.innerText = newState ? "✔" : "🚫";
+
+  const img = allImages.find(p => p.id === selectedPhotoId);
+  if (img) img.visible = newState;
 };
 
 /* ================= DEDICATIONS ================= */
@@ -254,11 +221,7 @@ async function loadDedications() {
   if (!list) return;
 
   const snapshot = await getDocs(
-    query(
-      collection(db, "dedications"),
-      orderBy("created", "desc"),
-      limit(DEDICATION_LIMIT)
-    )
+    query(collection(db, "dedications"), orderBy("created", "desc"), limit(DEDICATION_LIMIT))
   );
 
   list.innerHTML = "";
@@ -275,7 +238,6 @@ async function loadDedications() {
     `;
 
     item.onclick = () => openDedicationModal(data);
-
     list.appendChild(item);
   });
 
@@ -299,10 +261,14 @@ window.openSettings = () =>
 window.closeSettings = function () {
   showAuthor = document.getElementById("showAuthor").checked;
   showDedications = document.getElementById("showDedications").checked;
+
+  localStorage.setItem("showAuthor", showAuthor);
+  localStorage.setItem("showDedications", showDedications);
+
   document.getElementById("settingsModal").style.display = "none";
 };
 
-/* ================= DOWNLOAD DISABLED ================= */
+/* ================= DOWNLOAD ================= */
 window.downloadAllPhotos = function () {
   alert("Download trenutno nije dostupan 🙂");
 };
@@ -311,12 +277,13 @@ window.downloadAllPhotos = function () {
 window.startSlideshow = async function () {
   if (overlay) return;
 
+  if (slideshowInterval) {
+    clearInterval(slideshowInterval);
+    slideshowInterval = null;
+  }
+
   const snapshot = await getDocs(
-    query(
-      collection(db, "photos"),
-      orderBy("created", "desc"),
-      limit(IMAGE_LIMIT)
-    )
+    query(collection(db, "photos"), orderBy("created", "desc"), limit(IMAGE_LIMIT))
   );
 
   slideshowImages = [];
@@ -331,16 +298,16 @@ window.startSlideshow = async function () {
     });
   });
 
-  if (!slideshowImages.length) {
-    alert("Nema slika");
-    return;
-  }
+  if (!slideshowImages.length) return alert("Nema slika");
 
   overlay = document.createElement("div");
   overlay.id = "slideshowOverlay";
 
   const img = document.createElement("img");
-  overlay.appendChild(img);
+  const caption = document.createElement("div");
+  caption.className = "slideshow-caption";
+
+  overlay.append(img, caption);
   document.body.appendChild(overlay);
 
   function next() {
@@ -348,6 +315,13 @@ window.startSlideshow = async function () {
     const current = slideshowImages[i];
 
     img.src = current.url;
+
+    if (showAuthor) {
+      caption.innerText = "📸 " + current.user;
+      caption.style.display = "block";
+    } else {
+      caption.style.display = "none";
+    }
   }
 
   next();
