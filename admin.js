@@ -50,12 +50,13 @@ function buildImageList(snapshot) {
     if (currentFilter === "visible" && data.visible === false) return;
     if (currentFilter === "hidden" && data.visible !== false) return;
 
-    allImages.push({
-      id: docSnap.id,
-      url: data.imageUrl,
-      user: data.user || "Gost",
-      visible: data.visible !== false
-    });
+allImages.push({
+  id: docSnap.id,
+  url: data.imageUrl,
+  thumb: data.thumbUrl,
+  user: data.user || "Gost",
+  visible: data.visible !== false
+});
   });
 }
 
@@ -98,10 +99,13 @@ async function loadAllImages() {
     if (!imgData.visible) wrapper.classList.add("hidden-photo");
 
     const img = document.createElement("img");
-    img.src = imgData.url;
+    img.src = imgData.thumb || imgData.url;
     img.loading = "lazy";
     img.decoding = "async";
     img.style.touchAction = "manipulation";
+    
+    img.style.userSelect = "none";
+img.style.webkitUserSelect = "none";
 
     wrapper.appendChild(img);
 
@@ -111,25 +115,51 @@ async function loadAllImages() {
     wrapper.appendChild(badge);
 
     /* LONG PRESS */
-    let pressTimer;
-    let isLongPress = false;
+let pressTimer;
+let isLongPress = false;
+let startX = 0;
+let startY = 0;
+let moved = false;
 
-    const start = () => {
-      isLongPress = false;
-      pressTimer = setTimeout(() => {
-        isLongPress = true;
-        openPhotoAction(imgData.id, wrapper);
-      }, 600);
-    };
+const start = (e) => {
+  isLongPress = false;
+  moved = false;
 
-    const end = () => {
-      clearTimeout(pressTimer);
-      if (!isLongPress) openFullscreenFromList(imgData.id);
-    };
+  const touch = e.touches[0];
+  startX = touch.clientX;
+  startY = touch.clientY;
 
-    wrapper.addEventListener("touchstart", start);
-    wrapper.addEventListener("touchend", end);
-    wrapper.addEventListener("touchcancel", () => clearTimeout(pressTimer));
+  pressTimer = setTimeout(() => {
+    if (!moved) {
+      isLongPress = true;
+      openPhotoAction(imgData.id, wrapper);
+    }
+  }, 600);
+};
+
+const move = (e) => {
+  const touch = e.touches[0];
+  const dx = Math.abs(touch.clientX - startX);
+  const dy = Math.abs(touch.clientY - startY);
+
+ if (dx > 15 || dy > 15) {
+    moved = true;
+    clearTimeout(pressTimer);
+  }
+};
+
+const end = () => {
+  clearTimeout(pressTimer);
+
+  if (!isLongPress && !moved) {
+    openFullscreenFromList(imgData.id);
+  }
+};
+
+wrapper.addEventListener("touchstart", start);
+wrapper.addEventListener("touchmove", move); // 🔥 OVO TI FALI
+wrapper.addEventListener("touchend", end);
+wrapper.addEventListener("touchcancel", () => clearTimeout(pressTimer));
 
     gallery.appendChild(wrapper);
   });
@@ -139,6 +169,7 @@ async function loadAllImages() {
 
 /* ================= FULLSCREEN ================= */
 function openFullscreenFromList(photoId) {
+    if (document.querySelector(".admin-fullscreen")) return;
   let index = allImages.findIndex(p => p.id === photoId);
   if (index === -1) return;
 
@@ -167,19 +198,21 @@ function openFullscreenFromList(photoId) {
     isSwiping = true;
   });
 
-  full.addEventListener("touchend", e => {
-    const diff = startX - e.changedTouches[0].clientX;
+full.addEventListener("touchend", e => {
+  const diff = startX - e.changedTouches[0].clientX;
 
-    if (Math.abs(diff) > 50) {
-      index = diff > 0
-        ? (index + 1) % allImages.length
-        : (index - 1 + allImages.length) % allImages.length;
+  if (Math.abs(diff) > 50) {
+    index = diff > 0
+      ? (index + 1) % allImages.length
+      : (index - 1 + allImages.length) % allImages.length;
 
-      render();
-    } else if (!isSwiping) {
-      full.remove();
-    }
-  });
+    render();
+    return;
+  }
+
+  // 🔥 ako nije swipe → zatvori
+  full.remove();
+});
 
   render();
 }
