@@ -746,7 +746,7 @@ window.loadMyImages = async function () {
 const user = localStorage.getItem("name");
 const welcomeEl = document.getElementById("welcome");
 
-if (!user && !window.location.pathname.includes("index.html")) {
+if (!user && window.location.pathname !== "/") {
   window.location.href = "/";
 }
 
