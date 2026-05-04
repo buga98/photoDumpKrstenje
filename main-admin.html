@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="hr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Main Admin - PhotoDump</title>
+  <link rel="stylesheet" href="main-admin.css">
+</head>
+
+<body>
+
+<div class="topbar">⚙️ PhotoDump Main Admin</div>
+
+<main class="admin-page">
+
+  <section class="glass-card">
+    <h1>Kreiraj novi event</h1>
+    <p class="subtitle">Odaberi tip eventa, upiši naslov i dodaj točno 6 slika za bubble prikaz.</p>
+
+    <label>Naslov eventa</label>
+    <input id="eventTitle" type="text" placeholder="npr. Rođendan Ivan/Sveto krštenje Lucija/Mirko & Marica">
+<label>Original slike (full kvaliteta)</label>
+<select id="allowOriginals">
+  <option value="false" selected>Isključeno (manji storage)</option>
+  <option value="true">Uključeno (spremi original slike)</option>
+</select>
+    <label>Tip eventa</label>
+    <select id="eventType">
+      <option value="svadba">Vjenčanje</option>
+      <option value="krstenje">Krštenje</option>
+      <option value="rodendan">Rođendan</option>
+      <option value="pricest">Prva pričest</option>
+      <option value="party">Party</option>
+      <option value="default">Default</option>
+    </select>
+        <label class="file-box">
+      <span id="fileLabel">Dodaj 6 slika za bubble</span>
+      <input type="file" id="bubbleImages" multiple accept="image/*">
+    </label>
+        <div id="previewGrid" class="preview-grid"></div>
+<hr style="margin:25px 0; opacity:.2;">
+
+<h2 style="margin-bottom:10px;">✍️ Tekstovi aplikacije</h2>
+
+<!-- INDEX -->
+<label>Naslov (index)</label>
+<div class="input-row">
+  <input id="text_index_title" type="text">
+  <button onclick="fillDefault('index_title')">⬅️</button>
+</div>
+
+<label>Tekst (index)</label>
+<div class="input-row">
+  <textarea id="text_index_subtitle" rows="6"></textarea>
+  <button onclick="fillDefault('index_subtitle')">⬅️</button>
+</div>
+
+<!-- UPLOAD -->
+<label>Naslov (upload)</label>
+<div class="input-row">
+  <input id="text_upload_title" type="text">
+  <button onclick="fillDefault('upload_title')">⬅️</button>
+</div>
+
+<label>Tekst (upload)</label>
+<div class="input-row">
+  <input id="text_upload_subtitle" type="text">
+  <button onclick="fillDefault('upload_subtitle')">⬅️</button>
+</div>
+
+<!-- PROFILE -->
+<label>Naslov (profil)</label>
+<div class="input-row">
+  <input id="text_profile_title" type="text">
+  <button onclick="fillDefault('profile_title')">⬅️</button>
+</div>
+
+<label>Tekst (profil)</label>
+<div class="input-row">
+  <input id="text_profile_subtitle" type="text">
+  <button onclick="fillDefault('profile_subtitle')">⬅️</button>
+</div>
+<hr style="margin:25px 0; opacity:.2;">
+
+<h2 style="margin-bottom:10px;">👀 Live preview</h2>
+
+<div class="preview-tabs">
+  <button type="button" onclick="switchPreview('index')">Index</button>
+  <button type="button" onclick="switchPreview('app')">App</button>
+</div>
+
+<div class="preview-phone">
+  <div id="previewIndex" class="preview-screen active">
+    <div class="preview-topbar" id="previewIndexTopbar">Event</div>
+
+    <div class="preview-center">
+      <div class="preview-card">
+        <h3 id="previewIndexTitle">Naslov index</h3>
+        <p id="previewIndexText">Tekst index</p>
+        <input placeholder="Tvoje ime i prezime" disabled>
+        <button disabled>Uđi u galeriju 📸</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="previewApp" class="preview-screen">
+    <div class="preview-topbar" id="previewAppTopbar">Event</div>
+
+    <div class="preview-app-section">
+      <h3>Galerija uspomena 🤍</h3>
+      <p>Svaka fotografija postaje dio uspomena</p>
+
+      <div class="preview-stats">
+        <span>📸 0</span>
+        <span>💌 0</span>
+        <span>❤️ 0</span>
+      </div>
+    </div>
+
+    <div class="preview-app-section">
+      <h3 id="previewUploadTitle">Naslov upload</h3>
+      <p id="previewUploadText">Tekst upload</p>
+    </div>
+
+    <div class="preview-app-section">
+      <h3 id="previewProfileTitle">Naslov profil</h3>
+      <p id="previewProfileText">Tekst profil</p>
+    </div>
+  </div>
+</div>
+
+
+
+
+    <button id="createBtn" onclick="createNewEvent()">Kreiraj event 🚀</button>
+
+    <div id="resultBox" class="result-box"></div>
+
+    <div id="qrBox" class="qr-box">
+      <img id="qrImage" alt="QR kod">
+    </div>
+  </section>
+
+</main>
+
+<script type="module" src="main-admin.js"></script>
+
+</body>
+</html>

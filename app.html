@@ -14,17 +14,27 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="apple-touch-icon" href="icon.png">
 <link rel="icon" href="icon.png">
+<style>
+  body {
+    opacity: 0;
+    transition: opacity .25s ease;
+  }
+  body.loaded {
+    opacity: 1;
+  }
+</style>
 </head>
 <body>
-<div class="topbar">✨ Sveto krštenje Nika ✨</div>
+<div class="topbar" id="eventTitle">Učitavanje...</div>
 
 <div class="app">
 
   <!-- HOME -->
   <div id="homeTab" class="screen active">
 <div class="feed-header glass">
-  <h2>Galerija uspomena 🤍</h2>
-  <p>Svaka fotografija postaje dio uspomena naše Nike</p>
+<!-- HOME -->
+<h2 id="homeTitle">Galerija uspomena 🤍</h2>
+<p id="homeSubtitle">Svaka fotografija postaje dio uspomena</p>
 
   <div class="live-stats">
     <div>📸 <span id="livePhotoCount">0</span></div>
@@ -42,8 +52,9 @@
 
   <!-- HEADER -->
   <div class="upload-header glass">
-<h2>Podijeli trenutak 📸</h2>
-<p>Dodaj fotografiju i ostavi uspomenu za Niku 🕊️</p>
+<!-- UPLOAD -->
+<h2 id="uploadTitle">Podijeli trenutak 📸</h2>
+<p id="uploadSubtitle">Dodaj fotografiju i ostavi uspomenu</p>
   </div>
 
   <!-- UPLOAD OPTIONS -->
@@ -65,7 +76,7 @@
 
   <!-- DEDICATION -->
   <div class="dedication-card-modern">
-    <textarea id="dedicationText" placeholder="Napiši posvetu Niki ✨🕊️"></textarea>
+    <textarea id="dedicationText" placeholder="Napiši posvetu"></textarea>
   </div>
 
   <button class="btn-primary" onclick="saveDedication()">
@@ -78,10 +89,13 @@
   <div id="profileTab" class="screen">
     <div class="profile-header glass">
 
-  <h2><span id="welcome"></span> 🕊️</h2>
+<!-- PROFILE -->
+<h2>
+  <span id="welcome"></span> 🕊️
+</h2>
 
-<p class="profile-sub">
-Ovdje su tvoje fotografije sa svetog krštenja 🕊️
+<p id="profileSubtitle" class="profile-sub">
+  Ovdje su tvoje fotografije
 </p>
 
 </div>

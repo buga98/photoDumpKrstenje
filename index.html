@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 
-<title>PhotoDump Nika</title>
+<title>PhotoDump</title>
 
 <link rel="stylesheet" href="style.css">
 
@@ -14,6 +14,20 @@
 <meta name="theme-color" content="#e91e63">
 
 <link rel="apple-touch-icon" href="icon.png">
+<script>
+  const eventId = new URLSearchParams(location.search).get("event");
+
+  if (eventId) {
+    const cached = localStorage.getItem("eventData_" + eventId);
+
+    if (cached) {
+      try {
+        const event = JSON.parse(cached);
+        document.documentElement.className = "theme-" + event.type;
+      } catch {}
+    }
+  }
+</script>
 </head>
 
 <body>
@@ -22,8 +36,8 @@
 <div class="floating-container"></div>
 
 <!-- top bar -->
-<div class="topbar">
-    ✨ Sveto krštenje Nika ✨
+<div class="topbar" id="eventTitle">
+    Učitavanje...
 </div>
 
 <!-- MAIN CARD -->
@@ -31,27 +45,17 @@
 
     <div class="glass-card">
 
-        <h1 onclick="secretAdminClick()">
-             Dobrodošli na poseban dan naše Nike 
-        </h1>
+<h1 id="eventHeading">
+ Učitavanje...
+</h1>
 
-      <p class="subtitle">
-            Dragi naši,<br><br>
-
-            hvala što ste danas s nama  
-            na dan svetog krštenja naše male Nike 🤍<br><br>
-
-            Podijelite svoje fotografije i uhvaćene trenutke  
-            kako bi ova predivna uspomena zauvijek ostala sa nama 📸<br><br>
-
-            Hvala vam na ljubavi, dolasku i blagoslovu ✨<br><br>
-
-            <span class="names">Nika 🤍</span>
-        </p>
+      <p class="subtitle" id="eventSubtitle">
+ Učitavanje...
+</p>
 
         <input type="text" id="name" placeholder="Tvoje ime i prezime">
 
-        <button onclick="enterApp()">Ulazak</button>
+        <button onclick="enterApp()">Uđi u galeriju 📸</button>
 
     </div>
 
@@ -73,53 +77,46 @@
   </div>
 </div>
 
-<script src="index.js"></script>
+<script type="module" src="index.js"></script>
 
 <script>
+window.enterApp = function () {
+  const name = document.getElementById("name").value.trim();
+
+  if (!name || name.length < 2) {
+    alert("Upiši ime i prezime");
+    return;
+  }
+
+  let userId = localStorage.getItem("userId");
+
+  if (!userId) {
+    userId = crypto.randomUUID();
+    localStorage.setItem("userId", userId);
+  }
+
+  localStorage.setItem("name", name);
+
+  const eventId = localStorage.getItem("eventId");
+
+  // 🔥 SAFE CALL
+  if (typeof createUser === "function") {
+    createUser(userId, name, eventId);
+  }
+
+  window.location.href = "/app.html?event=" + eventId;
+};
+/* 🔥 EVENT HANDLING */
+const params = new URLSearchParams(location.search);
+const eventIdFromUrl = params.get("event");
+
+
+if (eventIdFromUrl) {
+  localStorage.setItem("eventId", eventIdFromUrl);
+}
+
 window.addEventListener("load", () => {
   document.body.classList.add("loaded");
-});
-
-// FLOATING SLIKE (mjehurići)
-document.addEventListener("DOMContentLoaded", () => {
-
-  const images = ["1.jpg","2.jpg","3.jpg","4.jpg","5.jpg","6.jpg"];
-  const container = document.querySelector(".floating-container");
-
-  images.forEach((imgSrc) => {
-
-    const el = document.createElement("div");
-    el.className = "bubble";
-
-    el.style.backgroundImage = `url(${imgSrc})`;
-
-    let x = Math.random() * window.innerWidth;
-    let y = Math.random() * window.innerHeight;
-
-    let dx = (Math.random() - 0.5) * 1.2;
-    let dy = (Math.random() - 0.5) * 1.2;
-
-    el.style.left = x + "px";
-    el.style.top = y + "px";
-
-    container.appendChild(el);
-
-    function move() {
-      x += dx;
-      y += dy;
-
-      if (x <= 0 || x >= window.innerWidth - 80) dx *= -1;
-      if (y <= 0 || y >= window.innerHeight - 80) dy *= -1;
-
-      el.style.left = x + "px";
-      el.style.top = y + "px";
-
-      requestAnimationFrame(move);
-    }
-
-    move();
-  });
-
 });
 </script>
 
