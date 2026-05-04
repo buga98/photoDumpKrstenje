@@ -1,6 +1,6 @@
 {
-  "name": "Event PhotoDump",
-  "short_name": "Event PhotoDump",
+  "name": "Sveto krštenje Nika",
+  "short_name": "PhotoDump Nika",
   "start_url": "/index.html",
   "display": "standalone",
   "background_color": "#ffe6f0",
