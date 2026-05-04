@@ -238,23 +238,47 @@ const firstQuery = query(
   limit(FEED_PAGE_SIZE)
 );
 
-  onSnapshot(firstQuery, (snapshot) => {
+  onSnapshot(
+  firstQuery,
+  (snapshot) => {
+
+    // 🔥 ukloni skeleton
     if (feed.dataset.loaded !== "true") {
       feed.innerHTML = "";
       feed.dataset.loaded = "true";
     }
 
-    if (!snapshot.empty) {
-      lastVisiblePhoto = snapshot.docs[snapshot.docs.length - 1];
+    // 🔥 AKO NEMA SLIKA
+    if (snapshot.empty) {
+      feed.innerHTML = `
+        <p style="grid-column:1/-1; opacity:0.6; text-align:center;">
+          Još nema fotografija 📸
+        </p>
+      `;
+      return;
     }
+
+    lastVisiblePhoto = snapshot.docs[snapshot.docs.length - 1];
 
     snapshot.docChanges().forEach((change) => {
       renderFeedChange(change, feed, true);
     });
 
     createFeedObserver(feed);
-  });
-}
+  },
+
+  // 🔥 KLJUČNO — ERROR HANDLER
+  (error) => {
+    console.error("Feed error:", error);
+
+    feed.innerHTML = `
+      <p style="grid-column:1/-1; color:#ff6b6b; text-align:center;">
+        Greška pri učitavanju 😕<br>
+        Provjeri internet ili pravila
+      </p>
+    `;
+  }
+);
 
 function renderFeedChange(change, feed, isLiveTop = false) {
   const docSnap = change.doc;
